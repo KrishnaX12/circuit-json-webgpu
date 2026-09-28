@@ -6,7 +6,7 @@ import {
   MeshBuilder,
   rectangle,
 } from "../lib/geometry"
-import { fixtures } from "../site/fixtures"
+import { fixtures, silkscreenGraphics } from "../site/fixtures"
 import large from "./fixtures/am3352-dev-board.circuit.json"
 
 function area(mesh: ReturnType<MeshBuilder["build"]>) {
@@ -120,4 +120,56 @@ test("square holes compile, including rotated holes", () => {
     expect(erase.length).toBeGreaterThan(0)
     expect(erase.every(Number.isFinite)).toBe(true)
   }
+})
+
+test("silkscreen graphics preserve filled areas, holes, arcs, layers, and IDs", () => {
+  const scene = compileCircuitJson(silkscreenGraphics)
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.elementIds).toEqual(["top-graphic", "bottom-graphic"])
+  expect(scene.layers.map((layer) => layer.name)).toEqual([
+    "top_silkscreen",
+    "bottom_silkscreen",
+  ])
+  // Square with a circular hole; circle with two square holes.
+  const expectedAreas = [144 - Math.PI * 9, Math.PI * 36 - 8]
+  for (const [index, layer] of scene.layers.entries()) {
+    expect(Math.abs(area(layer.paint) - expectedAreas[index])).toBeLessThan(
+      0.15,
+    )
+    expect(layer.erase.indices.length).toBe(0)
+    const xs = []
+    for (let i = 0; i < layer.paint.vertices.length; i += 8) {
+      xs.push(layer.paint.vertices[i])
+      expect(layer.paint.vertices[i + 6]).toBe(index)
+    }
+    expect(Math.min(...xs)).toBeCloseTo(index === 0 ? -18 : 6)
+    expect(Math.max(...xs)).toBeCloseTo(index === 0 ? -6 : 18)
+  }
+})
+
+test("silkscreen graphics without inner rings remain filled", () => {
+  const graphic = silkscreenGraphics[0]
+  const scene = compileCircuitJson([
+    {
+      ...graphic,
+      brep_shape: {
+        outer_ring: graphic.brep_shape.outer_ring,
+        inner_rings: [],
+      },
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(area(scene.layers[0].paint)).toBeCloseTo(144)
+})
+
+test("unsupported silkscreen graphic shapes still report a diagnostic", () => {
+  const scene = compileCircuitJson([
+    {
+      ...silkscreenGraphics[0],
+      shape: "future_shape",
+    },
+  ] as any)
+  expect(scene.diagnostics).toHaveLength(1)
+  expect(scene.diagnostics[0].elementId).toBe("top-graphic")
+  expect(scene.triangleCount).toBe(0)
 })

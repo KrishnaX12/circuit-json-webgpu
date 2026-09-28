@@ -238,6 +238,36 @@ try {
         ((y + 1) * image.width + x + 1) * 4 + 3,
       ),
     ]
+    if (name === "silkscreen-graphics") {
+      // World coordinates use the gallery's 14 px/mm camera. Check ink and
+      // clear holes independently so snapshot updates cannot fill the counters.
+      assert.deepEqual(
+        at(232, 230),
+        [242, 237, 161],
+        "Top graphic must use top silkscreen color",
+      )
+      assert.deepEqual(at(232, 300), [0, 0, 0], "Circular hole must stay clear")
+      assert.deepEqual(
+        at(568, 300),
+        [93, 169, 233],
+        "Bottom graphic must use bottom silkscreen color",
+      )
+      assert.deepEqual(
+        at(540, 300),
+        [0, 0, 0],
+        "First bottom hole must stay clear",
+      )
+      assert.deepEqual(
+        at(596, 300),
+        [0, 0, 0],
+        "Second bottom hole must stay clear",
+      )
+      assert.deepEqual(
+        at(638, 230),
+        [0, 0, 0],
+        "Outside the curved boundary stays clear",
+      )
+    }
     if (name === "board-outline-cutout")
       assert.deepEqual(at(400, 300), [0, 0, 0])
     if (name === "pour-holes-and-arcs") {
