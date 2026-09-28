@@ -233,7 +233,73 @@ const annotations = [
     stroke_width: 0.2,
   },
 ]
+// Absolute PCB coordinates: bottom-side graphics must not be mirrored again.
+export const silkscreenGraphics = [
+  {
+    type: "pcb_silkscreen_graphic",
+    pcb_silkscreen_graphic_id: "top-graphic",
+    pcb_component_id: "component",
+    layer: "top",
+    shape: "brep",
+    brep_shape: {
+      outer_ring: {
+        vertices: [
+          { x: -18, y: -6 },
+          { x: -6, y: -6 },
+          { x: -6, y: 6 },
+          { x: -18, y: 6 },
+        ],
+      },
+      inner_rings: [
+        {
+          vertices: [
+            { x: -15, y: 0, bulge: 1 },
+            { x: -9, y: 0, bulge: 1 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    type: "pcb_silkscreen_graphic",
+    pcb_silkscreen_graphic_id: "bottom-graphic",
+    pcb_component_id: "component",
+    layer: "bottom",
+    shape: "brep",
+    brep_shape: {
+      outer_ring: {
+        vertices: [
+          { x: 6, y: 0, bulge: 1 },
+          { x: 18, y: 0, bulge: 1 },
+        ],
+      },
+      inner_rings: [
+        {
+          vertices: [
+            { x: 9, y: -1 },
+            { x: 11, y: -1 },
+            { x: 11, y: 1 },
+            { x: 9, y: 1 },
+          ],
+        },
+        {
+          vertices: [
+            { x: 13, y: -1 },
+            { x: 15, y: -1 },
+            { x: 15, y: 1 },
+            { x: 13, y: 1 },
+          ],
+        },
+      ],
+    },
+  },
+] satisfies CircuitJson
+
 export const fixtures: Record<string, Fixture> = {
+  "silkscreen-graphics": {
+    elements: [board, ...silkscreenGraphics] as CircuitJson,
+    options: { selectedLayer: "top", hiddenLayerOpacity: 1 },
+  },
   teardrops: {
     elements: teardropDemo,
     options: {

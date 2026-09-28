@@ -233,6 +233,8 @@ export function compileCircuitJson(
             e.stroke_width ?? e.width ?? 0.05,
             type.endsWith("_outline"),
           )
+        } else if (type === "pcb_silkscreen_graphic" && e.shape === "brep") {
+          mesh.polygon(shape(e))
         } else if (type.endsWith("_rect")) {
           const points = rectangle(
             center(e),

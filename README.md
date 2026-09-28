@@ -37,7 +37,8 @@ immutable elements array to retain buffers; provide a new array after an edit.
 - BRep copper pours with polygon holes and signed bulge arcs.
 - Board/panel polygons, cutouts, soldermask openings.
 - Vector silkscreen/copper text (including knockout), multiline alignment/mirroring, paths, circles,
-  rectangles, fabrication notes, courtyards, and keepout outlines.
+  rectangles, BRep silkscreen graphics (including holes and bulge arcs),
+  fabrication notes, courtyards, and keepout outlines.
 - Per-layer textures preserve layer opacity without darkening overlapping traces;
   erase passes preserve drill/cutout transparency. Four-sample MSAA is the default.
 
