@@ -38,7 +38,7 @@ immutable elements array to retain buffers; provide a new array after an edit.
 - Board/panel polygons, cutouts, soldermask openings.
 - Vector silkscreen/copper text (including knockout), multiline alignment/mirroring, paths, circles,
   rectangles, BRep silkscreen graphics (including holes and bulge arcs),
-  fabrication notes, courtyards, and keepout outlines.
+  fabrication notes, courtyards, and translucent, diagonally hatched keepouts.
 - Per-layer textures preserve layer opacity without darkening overlapping traces;
   erase passes preserve drill/cutout transparency. Four-sample MSAA is the default.
 
@@ -50,7 +50,7 @@ unsupported shapes. The pcb-viewer integration does this automatically.
 This is an initial renderer, not full circuit-to-canvas feature parity. Curves are
 camera-independent tessellations; extreme zoom can reveal facets. Interpolated/through-pad trace routes, and additional future PCB element variants
 require further fixtures and implementations. Non-rendered metadata, solder paste,
-and debug objects are intentionally ignored. Keepouts currently render outlines.
+and debug objects are intentionally ignored. Keepouts render a translucent fill and clipped diagonal hatching.
 Device loss requires disposing/recreating the drawer or using a fallback. The
 renderer never silently switches to Canvas 2D.
 

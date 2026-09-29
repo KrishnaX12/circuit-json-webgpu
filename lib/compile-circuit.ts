@@ -3,6 +3,7 @@ import {
   getWireTaperSegments,
   hasWireTaper,
 } from "./get-wire-taper-polygon"
+import { drawKeepout } from "./draw-keepout"
 import { drawText } from "./text/draw-text"
 import { DEFAULT_LAYER_COLORS, normalizeLayer, parseColor } from "./colors"
 import {
@@ -117,6 +118,7 @@ export function compileCircuitJson(
     return mesh
   }
   const openings: { element: Element; index: number; layers: string[] }[] = []
+  const keepouts: { rings: Point[][]; index: number; layers: string[] }[] = []
   const cutouts: { rings: Point[][]; index: number }[] = []
   for (const [index, input] of elements.entries()) {
     const e = input as Element,
@@ -251,8 +253,11 @@ export function compileCircuitJson(
           else mesh.path(points, e.stroke_width ?? 0.05, true)
         } else throw new Error("Unsupported annotation geometry")
       } else if (type === "pcb_keepout") {
-        for (const layer of e.layers ?? [e.layer ?? "top"])
-          get(layer, index).path(shape(e)[0], e.stroke_width ?? 0.1, true)
+        keepouts.push({
+          rings: shape(e),
+          index,
+          layers: e.layers ?? [e.layer ?? "top"],
+        })
       } else if (
         type.startsWith("pcb_") &&
         ![
@@ -272,6 +277,18 @@ export function compileCircuitJson(
       diagnostics.push({
         elementId: elementIds[index],
         type,
+        message: String(error),
+      })
+    }
+  }
+  // Keep annotations visible regardless of the input order of copper pours.
+  for (const { rings, index, layers } of keepouts) {
+    try {
+      for (const layer of layers) drawKeepout(get(layer, index), rings)
+    } catch (error) {
+      diagnostics.push({
+        elementId: elementIds[index],
+        type: "pcb_keepout",
         message: String(error),
       })
     }

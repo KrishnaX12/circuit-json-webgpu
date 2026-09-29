@@ -295,7 +295,78 @@ export const silkscreenGraphics = [
   },
 ] satisfies CircuitJson
 
+// Keepouts precede copper deliberately: their markings must still be visible.
+export const keepouts = [
+  board,
+  {
+    type: "pcb_keepout",
+    pcb_keepout_id: "mounting-keepout",
+    shape: "circle",
+    center: { x: -10, y: 0 },
+    radius: 6,
+    layers: ["top", "inner1", "bottom"],
+  },
+  {
+    type: "pcb_keepout",
+    pcb_keepout_id: "rotated-keepout",
+    shape: "rect",
+    center: { x: 10, y: 0 },
+    width: 10,
+    height: 8,
+    rotation: 30,
+    layers: ["top", "inner1", "bottom"],
+  },
+  ...["top", "inner1", "bottom"].map((layer) => ({
+    type: "pcb_copper_pour",
+    pcb_copper_pour_id: `keepout-pour-${layer}`,
+    layer,
+    shape: "rect",
+    center: { x: 0, y: 0 },
+    width: 44,
+    height: 30,
+    // Match a mounting-hole copper clearance while leaving copper under the rect.
+    brep_shape: {
+      outer_ring: {
+        vertices: [
+          { x: -22, y: -15 },
+          { x: 22, y: -15 },
+          { x: 22, y: 15 },
+          { x: -22, y: 15 },
+        ],
+      },
+      inner_rings: [
+        {
+          vertices: Array.from({ length: 96 }, (_, i) => ({
+            x: -10 + 6 * Math.cos((i * Math.PI) / 48),
+            y: 6 * Math.sin((i * Math.PI) / 48),
+          })),
+        },
+      ],
+    },
+  })),
+  {
+    type: "pcb_hole",
+    pcb_hole_id: "mounting-hole",
+    hole_shape: "circle",
+    x: -10,
+    y: 0,
+    hole_diameter: 3,
+  },
+] as CircuitJson
+
 export const fixtures: Record<string, Fixture> = {
+  "keepouts-top": {
+    elements: keepouts,
+    options: { selectedLayer: "top", hiddenLayerOpacity: 0 },
+  },
+  "keepouts-inner": {
+    elements: keepouts,
+    options: { selectedLayer: "inner1", hiddenLayerOpacity: 0 },
+  },
+  "keepouts-bottom": {
+    elements: keepouts,
+    options: { selectedLayer: "bottom", hiddenLayerOpacity: 0 },
+  },
   "silkscreen-graphics": {
     elements: [board, ...silkscreenGraphics] as CircuitJson,
     options: { selectedLayer: "top", hiddenLayerOpacity: 1 },
