@@ -1,13 +1,20 @@
 import type { prepareComparison } from "./prepare"
 type Scene = NonNullable<ReturnType<typeof prepareComparison>["scene"]>
 import { CircuitToWebGpuDrawer } from "../../lib"
+import { parseColor } from "../../lib/colors"
+import { comparisonSilkscreenColors } from "./palette"
 let canvas: HTMLCanvasElement
 let drawer: CircuitToWebGpuDrawer
 async function render(scene: Scene) {
   if (!drawer) {
     canvas = document.createElement("canvas")
     document.body.append(canvas)
-    drawer = await CircuitToWebGpuDrawer.create(canvas)
+    drawer = await CircuitToWebGpuDrawer.create(canvas, {
+      layerColors: {
+        top_silkscreen: parseColor(comparisonSilkscreenColors.top),
+        bottom_silkscreen: parseColor(comparisonSilkscreenColors.bottom),
+      },
+    })
   }
   canvas.width = scene.width
   canvas.height = scene.height

@@ -281,7 +281,7 @@ try {
       assert.deepEqual(at(232, 300), [0, 0, 0], "Circular hole must stay clear")
       assert.deepEqual(
         at(568, 300),
-        [93, 169, 233],
+        [242, 237, 161],
         "Bottom graphic must use bottom silkscreen color",
       )
       assert.deepEqual(
