@@ -66,31 +66,6 @@ function isValidWireTaperSegment(segment) {
   return true;
 }
 
-// lib/text/fill-even-odd.ts
-function contains(ring, p) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const a = ring[i], b = ring[j];
-    if (a.y > p.y !== b.y > p.y && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
-      inside = !inside;
-  }
-  return inside;
-}
-function fillEvenOdd(mesh, rings) {
-  const contours = rings.filter((r) => r.length >= 3).map((ring) => ({ ring, parents: [] }));
-  for (const [i, c] of contours.entries())
-    c.parents = contours.flatMap(
-      (other, j) => i !== j && contains(other.ring, c.ring[0]) ? [j] : []
-    );
-  for (const [i, c] of contours.entries())
-    if (c.parents.length % 2 === 0) {
-      const holes = contours.filter(
-        (h) => h.parents.length === c.parents.length + 1 && h.parents.includes(i)
-      );
-      mesh.polygon([c.ring, ...holes.map((h) => h.ring)]);
-    }
-}
-
 // lib/geometry.ts
 import earcut from "earcut";
 var MeshBuilder = class {
@@ -218,6 +193,82 @@ function expandBrepRing(vertices) {
       });
   }
   return points;
+}
+
+// lib/draw-keepout.ts
+function clip(points, offset, above) {
+  const result = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length];
+    const da = a.x + a.y - offset, db = b.x + b.y - offset;
+    const insideA = above ? da >= 0 : da <= 0;
+    const insideB = above ? db >= 0 : db <= 0;
+    if (insideA) result.push(a);
+    if (insideA !== insideB) {
+      const t = da / (da - db);
+      result.push({ x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+    }
+  }
+  return result;
+}
+function drawKeepout(mesh, rings) {
+  const copperColor = mesh.color;
+  const color = [
+    copperColor[0] + (1 - copperColor[0]) * 0.4,
+    copperColor[1] + (1 - copperColor[1]) * 0.4,
+    copperColor[2] + (1 - copperColor[2]) * 0.4,
+    copperColor[3]
+  ];
+  mesh.color = [color[0], color[1], color[2], color[3] * 0.2];
+  mesh.polygon(rings);
+  mesh.color = color;
+  const surface = new MeshBuilder();
+  surface.polygon(rings);
+  const halfWidth = 0.15 * Math.SQRT2 / 2;
+  for (let i = 0; i < surface.indices.length; i += 3) {
+    const triangle = surface.indices.slice(i, i + 3).map((index) => ({
+      x: surface.vertices[index * 8],
+      y: surface.vertices[index * 8 + 1]
+    }));
+    const offsets = triangle.map((p) => p.x + p.y);
+    const start = Math.ceil(Math.min(...offsets) - halfWidth);
+    const end = Math.floor(Math.max(...offsets) + halfWidth);
+    for (let offset = start; offset <= end; offset++) {
+      mesh.polygon([
+        clip(
+          clip(triangle, offset - halfWidth, true),
+          offset + halfWidth,
+          false
+        )
+      ]);
+    }
+  }
+  mesh.color = copperColor;
+}
+
+// lib/text/fill-even-odd.ts
+function contains(ring, p) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if (a.y > p.y !== b.y > p.y && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
+      inside = !inside;
+  }
+  return inside;
+}
+function fillEvenOdd(mesh, rings) {
+  const contours = rings.filter((r) => r.length >= 3).map((ring) => ({ ring, parents: [] }));
+  for (const [i, c] of contours.entries())
+    c.parents = contours.flatMap(
+      (other, j) => i !== j && contains(other.ring, c.ring[0]) ? [j] : []
+    );
+  for (const [i, c] of contours.entries())
+    if (c.parents.length % 2 === 0) {
+      const holes = contours.filter(
+        (h) => h.parents.length === c.parents.length + 1 && h.parents.includes(i)
+      );
+      mesh.polygon([c.ring, ...holes.map((h) => h.ring)]);
+    }
 }
 
 // node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetLayout.ts
@@ -627,6 +678,7 @@ function compileCircuitJson(elements, options = {}) {
     return mesh;
   };
   const openings = [];
+  const keepouts = [];
   const cutouts = [];
   for (const [index, input] of elements.entries()) {
     const e = input, type = e.type;
@@ -728,8 +780,11 @@ function compileCircuitJson(elements, options = {}) {
           else mesh.path(points, e.stroke_width ?? 0.05, true);
         } else throw new Error("Unsupported annotation geometry");
       } else if (type === "pcb_keepout") {
-        for (const layer of e.layers ?? [e.layer ?? "top"])
-          get(layer, index).path(shape(e)[0], e.stroke_width ?? 0.1, true);
+        keepouts.push({
+          rings: shape(e),
+          index,
+          layers: e.layers ?? [e.layer ?? "top"]
+        });
       } else if (type.startsWith("pcb_") && ![
         "pcb_component",
         "pcb_port",
@@ -745,6 +800,17 @@ function compileCircuitJson(elements, options = {}) {
       diagnostics.push({
         elementId: elementIds[index],
         type,
+        message: String(error)
+      });
+    }
+  }
+  for (const { rings, index, layers: layers2 } of keepouts) {
+    try {
+      for (const layer of layers2) drawKeepout(get(layer, index), rings);
+    } catch (error) {
+      diagnostics.push({
+        elementId: elementIds[index],
+        type: "pcb_keepout",
         message: String(error)
       });
     }

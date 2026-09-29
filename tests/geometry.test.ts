@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { compileCircuitJson } from "../lib"
+import { drawKeepout } from "../lib/draw-keepout"
 import {
   ellipse,
   expandBrepRing,
@@ -172,4 +173,66 @@ test("unsupported silkscreen graphic shapes still report a diagnostic", () => {
   expect(scene.diagnostics).toHaveLength(1)
   expect(scene.diagnostics[0].elementId).toBe("top-graphic")
   expect(scene.triangleCount).toBe(0)
+})
+
+test("keepouts overlay later copper with translucent fill and clipped stripes on every layer", () => {
+  const scene = compileCircuitJson(fixtures["keepouts-top"].elements)
+  expect(scene.diagnostics).toEqual([])
+  for (const name of ["top", "inner1", "bottom"]) {
+    const mesh = scene.layers.find((layer) => layer.name === name)!.paint
+    const keepoutIndex = scene.elementIds.indexOf("mounting-keepout")
+    const pourIndex = scene.elementIds.indexOf(`keepout-pour-${name}`)
+    const vertices = Array.from(
+      { length: mesh.vertices.length / 8 },
+      (_, i) => [...mesh.vertices.slice(i * 8, i * 8 + 8)],
+    )
+    const marking = vertices.filter((v) => v[6] === keepoutIndex)
+    expect(marking.some((v) => Math.abs(v[5] - 0.2) < 1e-6)).toBe(true)
+    expect(marking.some((v) => v[5] === 1)).toBe(true)
+    expect(vertices.findIndex((v) => v[6] === keepoutIndex)).toBeGreaterThan(
+      vertices.length -
+        1 -
+        [...vertices].reverse().findIndex((v) => v[6] === pourIndex),
+    )
+    for (const v of marking)
+      expect(Math.hypot(v[0] + 10, v[1])).toBeLessThanOrEqual(6.00001)
+  }
+})
+
+test("keepout fill and stripes preserve holes in concave polygons", () => {
+  const mesh = new MeshBuilder()
+  drawKeepout(mesh, [
+    [
+      { x: 0, y: 0 },
+      { x: 8, y: 0 },
+      { x: 8, y: 4 },
+      { x: 4, y: 4 },
+      { x: 4, y: 8 },
+      { x: 0, y: 8 },
+    ],
+    rectangle({ x: 2, y: 2 }, 2, 2),
+  ])
+  let fillArea = 0,
+    stripeArea = 0
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const triangle = mesh.indices
+      .slice(i, i + 3)
+      .map((j) => ({ x: mesh.vertices[j * 8], y: mesh.vertices[j * 8 + 1] }))
+    const center = {
+      x: triangle.reduce((s, p) => s + p.x, 0) / 3,
+      y: triangle.reduce((s, p) => s + p.y, 0) / 3,
+    }
+    expect(center.x > 4 && center.y > 4).toBe(false)
+    expect(center.x > 1 && center.x < 3 && center.y > 1 && center.y < 3).toBe(
+      false,
+    )
+    const [a, b, c] = triangle
+    const area =
+      Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2
+    if (mesh.vertices[mesh.indices[i] * 8 + 5] === 0.2) fillArea += area
+    else stripeArea += area
+  }
+  expect(fillArea).toBeCloseTo(44)
+  expect(stripeArea).toBeGreaterThan(0)
+  expect(stripeArea).toBeLessThan(fillArea)
 })

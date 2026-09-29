@@ -238,6 +238,38 @@ try {
         ((y + 1) * image.width + x + 1) * 4 + 3,
       ),
     ]
+    if (name.startsWith("keepouts-")) {
+      const stripe = at(260, 258),
+        fill = at(264, 258)
+      assert(
+        stripe.every((c, i) => c > fill[i] + 50),
+        "Keepout must have bright stripes over a translucent fill",
+      )
+      assert(
+        fill.every((c) => c > 0),
+        "Keepout interior must not disappear into the clearance",
+      )
+      const copper =
+        name === "keepouts-top"
+          ? layerColors.top
+          : name === "keepouts-inner"
+            ? layerColors.inner1
+            : layerColors.bottom
+      assert.deepEqual(
+        at(260, 202),
+        copper.slice(0, 3),
+        "Hatching must stay inside the circular boundary",
+      )
+      assert.deepEqual(
+        at(260, 300),
+        [255, 38, 226],
+        "The mounting hole must remain visible",
+      )
+      assert(
+        at(540, 300).some((c, i) => c > copper[i] + 20),
+        "Keepouts must remain visible above a later copper pour",
+      )
+    }
     if (name === "silkscreen-graphics") {
       // World coordinates use the gallery's 14 px/mm camera. Check ink and
       // clear holes independently so snapshot updates cannot fill the counters.
