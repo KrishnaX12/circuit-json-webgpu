@@ -8,6 +8,7 @@ import { chromium } from "playwright"
 import { PNG } from "pngjs"
 import { compare } from "./compare.ts"
 import { prepareComparison } from "./prepare.ts"
+import { comparisonSilkscreenColors } from "./palette"
 import { convertCircuitJsonToPcbSvg } from "circuit-to-svg"
 import { Resvg } from "@resvg/resvg-js"
 const root = fileURLToPath(new URL("../../", import.meta.url))
@@ -95,6 +96,7 @@ try {
           includeVersion: false,
           drawPaddingOutsideBoard: false,
           backgroundColor: scene.background,
+          colorOverrides: { silkscreen: comparisonSilkscreenColors },
         },
       )
       await writeFile(new URL(`${c.id}.svg.svg`, dir), svg)
