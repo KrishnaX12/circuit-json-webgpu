@@ -514,7 +514,7 @@ var DEFAULT_LAYER_COLORS = {
   inner8: rgb(242, 237, 161),
   drill: rgb(255, 38, 226),
   top_silkscreen: rgb(242, 237, 161),
-  bottom_silkscreen: rgb(93, 169, 233),
+  bottom_silkscreen: rgb(242, 237, 161),
   soldermask_top: rgb(12, 55, 33),
   soldermask_bottom: rgb(12, 55, 33),
   top_fabrication: [1, 1, 1, 0.5],
