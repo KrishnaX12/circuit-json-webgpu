@@ -358,9 +358,24 @@ export class CircuitToWebGpuDrawer {
     }
     const selected = normalizeLayer(o.selectedLayer ?? "top"),
       filter = o.layers ? new Set(o.layers.map(normalizeLayer)) : undefined
+    const maskedDrills =
+      o.showSolderMask &&
+      (!filter || filter.has(`soldermask_${selected}`)) &&
+      this.layers.some((layer) => layer.name === `drill_${selected}`)
     const visible = this.layers
       .filter((l) => {
-        if (filter && !filter.has(l.name)) return false
+        if (l.name === "drill" && maskedDrills) return false
+        if (
+          l.name.startsWith("drill_") &&
+          (!maskedDrills || l.name !== `drill_${selected}`)
+        )
+          return false
+        if (
+          filter &&
+          !filter.has(l.name) &&
+          !(l.name.startsWith("drill_") && filter.has("drill"))
+        )
+          return false
         if (xRayActive && !this.isCopper(l.name)) return false
         if (l.name === "board" && !o.showBoardMaterial) return false
         if (
@@ -488,7 +503,9 @@ export class CircuitToWebGpuDrawer {
   }
   private order(layer: string, selected: string) {
     if (layer === "board") return -100
-    if (layer === "drill") return 200
+    // Exposed holes also cut through silkscreen; covered holes are excluded from
+    // the selected side's drill layer while its soldermask is visible.
+    if (layer === "drill" || layer.startsWith("drill_")) return 200
     if (layer === "edge_cuts") return 150
     const base =
       layer === selected

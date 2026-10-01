@@ -1,3 +1,6 @@
+// lib/compile-circuit.ts
+import { createBoardOwnerMap } from "@tscircuit/circuit-json-util";
+
 // lib/get-wire-taper-polygon.ts
 function hasWireTaper(point) {
   if (!point || typeof point !== "object") return false;
@@ -656,6 +659,49 @@ function shape(e, hole = false) {
   throw new Error(`Unsupported shape: ${kind}`);
 }
 function compileCircuitJson(elements, options = {}) {
+  const boardOwners = createBoardOwnerMap([...elements]);
+  const viasByPosition = /* @__PURE__ */ new Map();
+  const renderElements = elements.map((element, index) => ({ element, index }));
+  for (const element of elements) {
+    if (element.type !== "pcb_via") continue;
+    const board2 = boardOwners.get(element.pcb_via_id);
+    const key = JSON.stringify([board2?.pcb_board_id, element.x, element.y]);
+    const vias = viasByPosition.get(key) ?? [];
+    vias.push(element);
+    viasByPosition.set(key, vias);
+  }
+  for (const [index, trace] of elements.entries()) {
+    if (trace.type !== "pcb_trace") continue;
+    const board2 = boardOwners.get(trace.pcb_trace_id);
+    for (const [routeIndex, point] of trace.route.entries()) {
+      if (point.route_type !== "via") continue;
+      const key = JSON.stringify([board2?.pcb_board_id, point.x, point.y]);
+      const vias = viasByPosition.get(key) ?? [];
+      if (vias.some(
+        (via2) => via2.layers.includes(point.from_layer) && via2.layers.includes(point.to_layer)
+      ))
+        continue;
+      const via = {
+        type: "pcb_via",
+        pcb_via_id: `${trace.pcb_trace_id}_route_via_${routeIndex}`,
+        pcb_trace_id: trace.pcb_trace_id,
+        x: point.x,
+        y: point.y,
+        layers: [point.from_layer, point.to_layer],
+        hole_diameter: point.hole_diameter ?? board2?.min_via_hole_diameter ?? 0.25,
+        outer_diameter: point.outer_diameter ?? board2?.min_via_pad_diameter ?? 0.6,
+        tented_on_top: point.tented_on_top,
+        tented_on_bottom: point.tented_on_bottom
+      };
+      vias.push(via);
+      viasByPosition.set(key, vias);
+      renderElements.push({ element: via, index });
+    }
+  }
+  const isViaTented = (via, side) => {
+    const board2 = (via.pcb_via_id ? boardOwners.get(via.pcb_via_id) : void 0) ?? (via.pcb_trace_id ? boardOwners.get(via.pcb_trace_id) : void 0);
+    return (side === "top" ? via.tented_on_top : via.tented_on_bottom) ?? via.is_tented ?? (side === "top" ? board2?.default_via_tented_on_top : board2?.default_via_tented_on_bottom) ?? false;
+  };
   const builders = /* @__PURE__ */ new Map();
   const diagnostics = [], elementIds = elements.map(getElementId);
   const board = elements.find((e) => e.type === "pcb_board");
@@ -672,7 +718,8 @@ function compileCircuitJson(elements, options = {}) {
     if (!builders.has(name))
       builders.set(name, { paint: new MeshBuilder(), erase: new MeshBuilder() });
     const mesh = builders.get(name)[erase ? "erase" : "paint"];
-    mesh.color = options.layerColors?.[name] ?? DEFAULT_LAYER_COLORS[name] ?? [0.75, 0.75, 0.75, 1];
+    const colorLayer = name.startsWith("drill_") ? "drill" : name;
+    mesh.color = options.layerColors?.[colorLayer] ?? DEFAULT_LAYER_COLORS[colorLayer] ?? [0.75, 0.75, 0.75, 1];
     mesh.element = index;
     mesh.category = category;
     return mesh;
@@ -680,7 +727,7 @@ function compileCircuitJson(elements, options = {}) {
   const openings = [];
   const keepouts = [];
   const cutouts = [];
-  for (const [index, input] of elements.entries()) {
+  for (const { index, element: input } of renderElements) {
     const e = input, type = e.type;
     try {
       if (type === "pcb_board" || type === "pcb_panel") {
@@ -704,9 +751,13 @@ function compileCircuitJson(elements, options = {}) {
         }
         for (const layer of layers2) get(layer, index).polygon(shape(e));
         openings.push({ element: e, index, layers: layers2 });
-        for (const side of ["top", "bottom"])
-          if (layers2.includes(side) && !e.is_covered_with_solder_mask)
+        for (const side of ["top", "bottom"]) {
+          if (!layers2.includes(side)) continue;
+          const tented = type === "pcb_via" && isViaTented(e, side);
+          if (tented) get(`soldermask_${side}`, index).polygon(shape(e));
+          else if (!e.is_covered_with_solder_mask)
             get(`soldermask_${side}`, index, true).polygon(shape(e));
+        }
       } else if (type === "pcb_hole") {
         openings.push({
           element: { ...e, shape: e.hole_shape },
@@ -815,6 +866,13 @@ function compileCircuitJson(elements, options = {}) {
       });
     }
   }
+  const hasTentedVias = openings.some(
+    ({ element }) => element.type === "pcb_via" && (isViaTented(element, "top") || isViaTented(element, "bottom"))
+  );
+  if (hasTentedVias) {
+    get("drill_top", 0);
+    get("drill_bottom", 0);
+  }
   for (const { element, index, layers: layers2 } of openings) {
     const rings = shape(element, true);
     for (const layer of layers2) get(layer, index, true).polygon(rings);
@@ -824,8 +882,11 @@ function compileCircuitJson(elements, options = {}) {
       get("drill", index).polygon(rings);
     }
     for (const side of ["top", "bottom"])
-      if (layers2.includes(side))
+      if (layers2.includes(side) && !(element.type === "pcb_via" && isViaTented(element, side))) {
         get(`soldermask_${side}`, index, true).polygon(rings);
+        if (isThrough && hasTentedVias)
+          get(`drill_${side}`, index).polygon(rings);
+      }
   }
   for (const { rings, index } of cutouts)
     for (const name of builders.keys())
@@ -1221,8 +1282,13 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
       this.highlightKey = key;
     }
     const selected = normalizeLayer(o.selectedLayer ?? "top"), filter = o.layers ? new Set(o.layers.map(normalizeLayer)) : void 0;
+    const maskedDrills = o.showSolderMask && (!filter || filter.has(`soldermask_${selected}`)) && this.layers.some((layer) => layer.name === `drill_${selected}`);
     const visible = this.layers.filter((l) => {
-      if (filter && !filter.has(l.name)) return false;
+      if (l.name === "drill" && maskedDrills) return false;
+      if (l.name.startsWith("drill_") && (!maskedDrills || l.name !== `drill_${selected}`))
+        return false;
+      if (filter && !filter.has(l.name) && !(l.name.startsWith("drill_") && filter.has("drill")))
+        return false;
       if (xRayActive && !this.isCopper(l.name)) return false;
       if (l.name === "board" && !o.showBoardMaterial) return false;
       if (l.name.startsWith("soldermask_") && (!o.showSolderMask || l.name !== `soldermask_${selected}`))
@@ -1323,7 +1389,7 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
   }
   order(layer, selected) {
     if (layer === "board") return -100;
-    if (layer === "drill") return 200;
+    if (layer === "drill" || layer.startsWith("drill_")) return 200;
     if (layer === "edge_cuts") return 150;
     const base = layer === selected ? 100 : layer.startsWith("inner") ? 20 - Number(layer.slice(5)) : layer === "bottom" ? 30 : 40;
     if (layer.includes("soldermask")) return 110;

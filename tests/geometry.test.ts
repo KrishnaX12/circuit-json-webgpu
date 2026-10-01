@@ -1,3 +1,4 @@
+import type { PcbBoard, PcbVia, PcbTrace } from "circuit-json"
 import { expect, test } from "bun:test"
 import { compileCircuitJson } from "../lib"
 import { drawKeepout } from "../lib/draw-keepout"
@@ -96,9 +97,12 @@ test("wire-to-via segments stay on the adjacent layer without bridging other run
       ],
     },
   ] as any)
-  expect(scene.layers.map((l) => l.name).sort()).toEqual(["bottom", "top"])
+  expect(scene.layers.map((l) => l.name)).toEqual(
+    expect.arrayContaining(["bottom", "top", "board", "drill"]),
+  )
+  // Preserve the wire segment while also emitting the route via pad.
   expect(area(scene.layers.find((l) => l.name === "top")!.paint)).toBeCloseTo(
-    5 + Math.PI / 4,
+    5 + Math.PI / 4 + Math.PI * 0.3 ** 2,
     1,
   )
 })
@@ -235,4 +239,151 @@ test("keepout fill and stripes preserve holes in concave polygons", () => {
   expect(fillArea).toBeCloseTo(44)
   expect(stripeArea).toBeGreaterThan(0)
   expect(stripeArea).toBeLessThan(fillArea)
+})
+
+const tentingBoard: PcbBoard = {
+  type: "pcb_board",
+  pcb_board_id: "board",
+  center: { x: 0, y: 0 },
+  width: 20,
+  height: 10,
+  thickness: 1.6,
+  num_layers: 2,
+  material: "fr4",
+}
+const tentingVia: PcbVia = {
+  type: "pcb_via",
+  pcb_via_id: "via",
+  x: 3,
+  y: 2,
+  hole_diameter: 1,
+  outer_diameter: 2,
+  layers: ["top", "bottom"],
+}
+
+test("tenting changes only mask openings, preserving standalone and route via drills", () => {
+  for (const routeOnly of [false, true]) {
+    for (const boardTented of [false, true]) {
+      for (const override of [undefined, false, true]) {
+        const trace: PcbTrace = {
+          type: "pcb_trace",
+          pcb_trace_id: "trace",
+          route: [
+            {
+              route_type: "via",
+              x: 3,
+              y: 2,
+              from_layer: "top",
+              to_layer: "bottom",
+              hole_diameter: 1,
+              outer_diameter: 2,
+              tented_on_top: override,
+            },
+          ],
+        }
+        const scene = compileCircuitJson([
+          {
+            ...tentingBoard,
+            default_via_tented_on_top: boardTented,
+            default_via_tented_on_bottom: !boardTented,
+          },
+          routeOnly ? trace : { ...tentingVia, tented_on_top: override },
+        ])
+        expect(scene.diagnostics).toEqual([])
+        for (const side of ["top", "bottom"] as const) {
+          const tented =
+            side === "top" ? (override ?? boardTented) : !boardTented
+          const mask = scene.layers.find(
+            (layer) => layer.name === `soldermask_${side}`,
+          )!
+          expect(mask.erase.indices.length === 0).toBe(tented)
+          const surfaceDrills =
+            scene.layers.find((layer) => layer.name === `drill_${side}`) ??
+            scene.layers.find((layer) => layer.name === "drill")!
+          expect(surfaceDrills.paint.indices.length === 0).toBe(tented)
+          expect(
+            area(scene.layers.find((layer) => layer.name === side)!.erase),
+          ).toBeCloseTo(Math.PI / 4, 1)
+        }
+        expect(
+          area(scene.layers.find((layer) => layer.name === "board")!.erase),
+        ).toBeCloseTo(Math.PI / 4, 1)
+        expect(
+          area(scene.layers.find((layer) => layer.name === "drill")!.paint),
+        ).toBeCloseTo(Math.PI / 4, 1)
+        expect(scene.elementIds).toEqual(["board", routeOnly ? "trace" : "via"])
+      }
+    }
+  }
+})
+
+test("route vias use owning board dimensions and deduplicate without losing explicit overrides", () => {
+  const trace: PcbTrace = {
+    type: "pcb_trace",
+    pcb_trace_id: "trace",
+    subcircuit_id: "b",
+    route: [
+      {
+        route_type: "via",
+        x: 3,
+        y: 2,
+        from_layer: "top",
+        to_layer: "bottom",
+      },
+    ],
+  }
+  const boards: PcbBoard[] = [
+    {
+      ...tentingBoard,
+      pcb_board_id: "a",
+      subcircuit_id: "a",
+      default_via_tented_on_top: false,
+      min_via_hole_diameter: 0.25,
+    },
+    {
+      ...tentingBoard,
+      pcb_board_id: "b",
+      subcircuit_id: "b",
+      default_via_tented_on_top: true,
+      min_via_hole_diameter: 1,
+      min_via_pad_diameter: 2,
+    },
+  ]
+  const once = compileCircuitJson([...boards, trace])
+  const repeated = compileCircuitJson([
+    ...boards,
+    { ...trace, route: [...trace.route, ...trace.route] },
+  ])
+  expect(repeated).toEqual(once)
+  expect(
+    area(once.layers.find((layer) => layer.name === "drill")!.paint),
+  ).toBeCloseTo(Math.PI / 4, 1)
+  expect(
+    area(once.layers.find((layer) => layer.name === "top")!.paint),
+  ).toBeCloseTo(Math.PI, 1)
+  expect(
+    once.layers.find((layer) => layer.name === "soldermask_top")!.erase.indices
+      .length,
+  ).toBe(0)
+  const explicit = compileCircuitJson([
+    ...boards,
+    trace,
+    {
+      ...tentingVia,
+      subcircuit_id: "b",
+      tented_on_top: false,
+      ...{ is_tented: true },
+    },
+  ])
+  expect(
+    area(explicit.layers.find((layer) => layer.name === "drill")!.paint),
+  ).toBeCloseTo(Math.PI / 4, 1)
+  expect(
+    explicit.layers.find((layer) => layer.name === "soldermask_top")!.erase
+      .indices.length,
+  ).toBeGreaterThan(0)
+  expect(
+    explicit.layers.find((layer) => layer.name === "soldermask_bottom")!.erase
+      .indices.length,
+  ).toBe(0)
 })
