@@ -792,7 +792,9 @@ function compileCircuitJson(elements, options = {}) {
         "pcb_solder_paste",
         "pcb_debug_object",
         "pcb_trace_hint",
-        "pcb_anchor"
+        "pcb_anchor",
+        "pcb_breakout_point"
+        // Routing target metadata, not visible geometry.
       ].includes(type) && !/_(error|warning)$/.test(type)) {
         throw new Error("Unsupported PCB element");
       }

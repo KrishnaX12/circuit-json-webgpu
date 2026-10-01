@@ -9,6 +9,7 @@ import {
 } from "../lib/geometry"
 import { fixtures, silkscreenGraphics } from "../site/fixtures"
 import large from "./fixtures/am3352-dev-board.circuit.json"
+import breakout from "./fixtures/f1c100s-breakout.circuit.json"
 
 function area(mesh: ReturnType<MeshBuilder["build"]>) {
   let area = 0
@@ -75,6 +76,46 @@ test("AM3352 compiles without unsupported PCB geometry", () => {
   const scene = compileCircuitJson(large as any)
   expect(scene.diagnostics).toEqual([])
   expect(scene.triangleCount).toBeGreaterThan(100000)
+})
+
+test("F1C100S breakout routing targets do not fail or change rendered geometry", () => {
+  const scene = compileCircuitJson(breakout as any)
+  const geometry = breakout.filter((e) => e.type !== "pcb_breakout_point")
+  const reference = compileCircuitJson(geometry as any)
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.elementIds).toContain("pcb_breakout_point_0")
+  expect(scene.triangleCount).toBeGreaterThan(0)
+  expect(scene.triangleCount).toBe(reference.triangleCount)
+  expect(scene.layers.map((l) => l.name)).toEqual(
+    reference.layers.map((l) => l.name),
+  )
+  for (const [i, layer] of scene.layers.entries()) {
+    for (const kind of ["paint", "erase"] as const) {
+      const actual = layer[kind],
+        expected = reference.layers[i][kind]
+      expect(actual.indices).toEqual(expected.indices)
+      expect(actual.vertices.length).toBe(expected.vertices.length)
+      for (let j = 0; j < actual.vertices.length; j++) {
+        // Adding metadata shifts indices, but highlighting must still refer to
+        // the same rendered element. All other vertex attributes stay identical.
+        if (j % 8 === 6)
+          expect(scene.elementIds[actual.vertices[j]]).toBe(
+            reference.elementIds[expected.vertices[j]],
+          )
+        else expect(actual.vertices[j]).toBe(expected.vertices[j])
+      }
+    }
+  }
+})
+
+test("breakout routing targets alone produce no renderable geometry", () => {
+  const scene = compileCircuitJson(
+    breakout.filter((e) => e.type === "pcb_breakout_point") as any,
+  )
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.layers).toEqual([])
+  expect(scene.triangleCount).toBe(0)
+  expect(scene.elementIds).toEqual(["pcb_breakout_point_0"])
 })
 
 test("wire-to-via segments stay on the adjacent layer without bridging other runs", () => {

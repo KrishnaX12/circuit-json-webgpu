@@ -160,6 +160,22 @@ machines without a hardware GPU, use `WEBGPU_SOFTWARE=1` (SwiftShader), with
 `xvfb-run -a` on Linux. This still executes WebGPU shaders, not Canvas drawing.
 Use `bun run start` for the interactive live WebGPU fixture gallery.
 
+### F1C100S breakout routing regression
+
+`tests/fixtures/f1c100s-breakout.circuit.json` is a minimal, unchanged subset
+(board, breakout point, connected fanout trace, and pad) of
+[seveibar/f1c100s-linux-dev-board v1.9.2](https://tscircuit.com/seveibar/f1c100s-linux-dev-board#pcb),
+release `97a9c4d9-9cae-4ae8-a085-3cdf60a3a8a0`.
+Previously, `compileCircuitJson` reported `pcb_breakout_point` as unsupported,
+causing pcb-viewer's worker to reject the entire scene. Breakout points are
+routing targets with no visible geometry, like PCB ports and trace hints; they
+now retain their element IDs without generating meshes or diagnostics.
+
+```sh
+bun test tests/geometry.test.ts --test-name-pattern "breakout routing"
+bun run render tests/fixtures/f1c100s-breakout.circuit.json --viewport -6,3,-4,4.5
+```
+
 ## Complete feature snapshot suite
 
 ```sh
