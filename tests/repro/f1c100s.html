@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>F1C100S worker freeze reproduction</title>
+<style>
+body { font: 16px system-ui; background: #222; color: white; }
+canvas { width: 1000px; max-width: 100%; height: 750px; }
+pre { white-space: pre-wrap; }
+</style>
+<h1>F1C100S worker freeze reproduction</h1>
+<p>Run <code>bun scripts/prepare-f1c100s-repro.ts</code> first. Compare
+<a href="?baseline">baseline</a> and <a href="?patched">patched</a> in Google Chrome.</p>
+<p id="heartbeat">Heartbeat starting</p>
+<button id="run">Render published board</button>
+<pre id="status">Ready</pre>
+<canvas width="1200" height="900"></canvas>
+<script type="module" src="./f1c100s.ts"></script>
