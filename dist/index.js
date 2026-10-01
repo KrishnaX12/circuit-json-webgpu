@@ -246,6 +246,66 @@ function drawKeepout(mesh, rings) {
   mesh.color = copperColor;
 }
 
+// lib/colors.ts
+var rgb = (r, g, b) => [
+  r / 255,
+  g / 255,
+  b / 255,
+  1
+];
+var DEFAULT_LAYER_COLORS = {
+  board: rgb(70, 72, 72),
+  top: rgb(200, 52, 52),
+  bottom: rgb(77, 127, 196),
+  inner1: rgb(127, 200, 127),
+  inner2: rgb(206, 125, 44),
+  inner3: rgb(79, 203, 203),
+  inner4: rgb(219, 98, 139),
+  inner5: rgb(167, 165, 198),
+  inner6: rgb(40, 204, 217),
+  inner7: rgb(232, 178, 167),
+  inner8: rgb(242, 237, 161),
+  drill: rgb(255, 38, 226),
+  top_silkscreen: rgb(242, 237, 161),
+  bottom_silkscreen: rgb(242, 237, 161),
+  soldermask_top: rgb(12, 55, 33),
+  soldermask_bottom: rgb(12, 55, 33),
+  top_fabrication: [1, 1, 1, 0.5],
+  bottom_fabrication: [1, 1, 1, 0.5],
+  top_notes: rgb(89, 148, 220),
+  bottom_notes: rgb(89, 148, 220),
+  top_courtyard: rgb(255, 0, 245),
+  bottom_courtyard: rgb(38, 233, 255),
+  edge_cuts: rgb(208, 210, 205)
+};
+var normalizeLayer = (layer) => layer.replace(/_copper$/, "");
+function parseColor(value) {
+  const hex = value.match(/^#([0-9a-f]{3,8})$/i)?.[1];
+  if (hex) {
+    const full = hex.length <= 4 ? [...hex].map((c) => c + c).join("") : hex;
+    if (full.length !== 6 && full.length !== 8)
+      throw new Error(`Unsupported color: ${value}`);
+    return [
+      parseInt(full.slice(0, 2), 16) / 255,
+      parseInt(full.slice(2, 4), 16) / 255,
+      parseInt(full.slice(4, 6), 16) / 255,
+      full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1
+    ];
+  }
+  const match = value.match(/^rgba?\(([^)]+)\)$/);
+  if (match) {
+    const channels = match[1].split(",").map((v) => Number(v.trim()));
+    if ((channels.length === 3 || channels.length === 4) && channels.every(Number.isFinite))
+      return [
+        channels[0] / 255,
+        channels[1] / 255,
+        channels[2] / 255,
+        channels[3] ?? 1
+      ];
+  }
+  throw new Error(`Unsupported color: ${value}`);
+}
+
 // lib/text/fill-even-odd.ts
 function contains(ring, p) {
   let inside = false;
@@ -544,64 +604,113 @@ function drawText(mesh, e, yAxis = "up") {
     );
 }
 
-// lib/colors.ts
-var rgb = (r, g, b) => [
-  r / 255,
-  g / 255,
-  b / 255,
-  1
-];
-var DEFAULT_LAYER_COLORS = {
-  board: rgb(70, 72, 72),
-  top: rgb(200, 52, 52),
-  bottom: rgb(77, 127, 196),
-  inner1: rgb(127, 200, 127),
-  inner2: rgb(206, 125, 44),
-  inner3: rgb(79, 203, 203),
-  inner4: rgb(219, 98, 139),
-  inner5: rgb(167, 165, 198),
-  inner6: rgb(40, 204, 217),
-  inner7: rgb(232, 178, 167),
-  inner8: rgb(242, 237, 161),
-  drill: rgb(255, 38, 226),
-  top_silkscreen: rgb(242, 237, 161),
-  bottom_silkscreen: rgb(242, 237, 161),
-  soldermask_top: rgb(12, 55, 33),
-  soldermask_bottom: rgb(12, 55, 33),
-  top_fabrication: [1, 1, 1, 0.5],
-  bottom_fabrication: [1, 1, 1, 0.5],
-  top_notes: rgb(89, 148, 220),
-  bottom_notes: rgb(89, 148, 220),
-  top_courtyard: rgb(255, 0, 245),
-  bottom_courtyard: rgb(38, 233, 255),
-  edge_cuts: rgb(208, 210, 205)
-};
-var normalizeLayer = (layer) => layer.replace(/_copper$/, "");
-function parseColor(value) {
-  const hex = value.match(/^#([0-9a-f]{3,8})$/i)?.[1];
-  if (hex) {
-    const full = hex.length <= 4 ? [...hex].map((c) => c + c).join("") : hex;
-    if (full.length !== 6 && full.length !== 8)
-      throw new Error(`Unsupported color: ${value}`);
-    return [
-      parseInt(full.slice(0, 2), 16) / 255,
-      parseInt(full.slice(2, 4), 16) / 255,
-      parseInt(full.slice(4, 6), 16) / 255,
-      full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1
-    ];
+// lib/draw-dimension.ts
+function isDimensionElement(element) {
+  return typeof element.type === "string" && isPoint(element.from) && isPoint(element.to);
+}
+var TEXT_OFFSET_MULTIPLIER = 1.5;
+var CHARACTER_WIDTH_MULTIPLIER = 0.6;
+var TEXT_INTERSECTION_PADDING_MULTIPLIER = 0.3;
+function drawDimension(params) {
+  const { element, mesh } = params;
+  if (element.color) mesh.color = parseColor(element.color);
+  const direction = normalize({
+    x: element.to.x - element.from.x,
+    y: element.to.y - element.from.y
+  });
+  const perpendicular = { x: -direction.y, y: direction.x };
+  const offsetDirection = normalize(element.offset_direction ?? { x: 0, y: 0 });
+  const offsetDistance = element.offset_distance ?? 0;
+  const offset = {
+    x: offsetDirection.x * offsetDistance,
+    y: offsetDirection.y * offsetDistance
+  };
+  const from = addPoints(element.from, offset);
+  const to = addPoints(element.to, offset);
+  const arrowSize = element.arrow_size ?? 1;
+  const strokeWidth = arrowSize / 5;
+  const fromBase = addPoints(from, scalePoint(direction, arrowSize));
+  const toBase = addPoints(to, scalePoint(direction, -arrowSize));
+  mesh.polygon([
+    [
+      from,
+      addPoints(fromBase, scalePoint(perpendicular, arrowSize / 2)),
+      addPoints(fromBase, scalePoint(perpendicular, strokeWidth / 2)),
+      addPoints(toBase, scalePoint(perpendicular, strokeWidth / 2)),
+      addPoints(toBase, scalePoint(perpendicular, arrowSize / 2)),
+      to,
+      addPoints(toBase, scalePoint(perpendicular, -arrowSize / 2)),
+      addPoints(toBase, scalePoint(perpendicular, -strokeWidth / 2)),
+      addPoints(fromBase, scalePoint(perpendicular, -strokeWidth / 2)),
+      addPoints(fromBase, scalePoint(perpendicular, -arrowSize / 2))
+    ]
+  ]);
+  const extensionDirection = element.offset_direction && offsetDistance !== 0 ? offsetDirection : perpendicular;
+  const extensionLength = offsetDistance + 0.5;
+  for (const anchor of [element.from, element.to]) {
+    mesh.line(
+      anchor,
+      addPoints(anchor, scalePoint(extensionDirection, extensionLength)),
+      strokeWidth
+    );
   }
-  const match = value.match(/^rgba?\(([^)]+)\)$/);
-  if (match) {
-    const channels = match[1].split(",").map((v) => Number(v.trim()));
-    if ((channels.length === 3 || channels.length === 4) && channels.every(Number.isFinite))
-      return [
-        channels[0] / 255,
-        channels[1] / 255,
-        channels[2] / 255,
-        channels[3] ?? 1
-      ];
-  }
-  throw new Error(`Unsupported color: ${value}`);
+  if (!element.text) return;
+  const fontSize = element.font_size ?? 1;
+  const textRotation = getTextRotation({
+    direction,
+    requestedRotation: element.text_ccw_rotation
+  });
+  const textOffset = arrowSize * TEXT_OFFSET_MULTIPLIER + getRotatedTextClearance({
+    fontSize,
+    rotationDegrees: element.text_ccw_rotation,
+    text: element.text
+  });
+  const midpoint = {
+    x: (element.from.x + element.to.x) / 2 + offset.x,
+    y: (element.from.y + element.to.y) / 2 + offset.y
+  };
+  drawText(
+    mesh,
+    {
+      anchor_alignment: "center",
+      anchor_position: addPoints(
+        midpoint,
+        scalePoint(perpendicular, textOffset)
+      ),
+      ccw_rotation: textRotation,
+      font_size: fontSize,
+      text: element.text,
+      type: `${element.type}_text`
+    },
+    params.textYAxis
+  );
+}
+function getTextRotation(params) {
+  let directionDegrees = Math.atan2(params.direction.y, params.direction.x) * 180 / Math.PI;
+  if (directionDegrees > 90 || directionDegrees < -90) directionDegrees += 180;
+  return directionDegrees - (params.requestedRotation ?? 0);
+}
+function getRotatedTextClearance(params) {
+  if (params.rotationDegrees === void 0 || !Number.isFinite(params.rotationDegrees))
+    return 0;
+  const rotationRadians = params.rotationDegrees * Math.PI / 180;
+  const halfWidth = params.text.length * params.fontSize * CHARACTER_WIDTH_MULTIPLIER / 2;
+  const halfHeight = params.fontSize / 2;
+  const maximumExtension = halfWidth * Math.abs(Math.sin(rotationRadians)) + halfHeight * Math.abs(Math.cos(rotationRadians));
+  return maximumExtension + params.fontSize * TEXT_INTERSECTION_PADDING_MULTIPLIER;
+}
+function normalize(point) {
+  const length = Math.hypot(point.x, point.y) || 1;
+  return { x: point.x / length, y: point.y / length };
+}
+function addPoints(first, second) {
+  return { x: first.x + second.x, y: first.y + second.y };
+}
+function scalePoint(point, scale) {
+  return { x: point.x * scale, y: point.y * scale };
+}
+function isPoint(point) {
+  return typeof point === "object" && point !== null && "x" in point && typeof point.x === "number" && "y" in point && typeof point.y === "number";
 }
 
 // lib/compile-circuit.ts
@@ -751,7 +860,11 @@ function compileCircuitJson(elements, options = {}) {
           user_note: "notes"
         }[group];
         const layer = `${e.layer ?? "top"}_${suffix}`, mesh = get(layer, index);
-        if (type.endsWith("_text")) {
+        if (type.endsWith("_dimension")) {
+          if (!isDimensionElement(e))
+            throw new Error("Invalid dimension geometry");
+          drawDimension({ element: e, mesh, textYAxis: options.textYAxis });
+        } else if (type.endsWith("_text")) {
           if (e.color && (group === "note" || group === "fabrication_note"))
             mesh.color = parseColor(e.color);
           drawText(mesh, e, options.textYAxis);

@@ -4,6 +4,7 @@ import {
   hasWireTaper,
 } from "./get-wire-taper-polygon"
 import { drawKeepout } from "./draw-keepout"
+import { drawDimension, isDimensionElement } from "./draw-dimension"
 import { drawText } from "./text/draw-text"
 import { DEFAULT_LAYER_COLORS, normalizeLayer, parseColor } from "./colors"
 import {
@@ -219,7 +220,11 @@ export function compileCircuitJson(
         }[group]!
         const layer = `${e.layer ?? "top"}_${suffix}`,
           mesh = get(layer, index)
-        if (type.endsWith("_text")) {
+        if (type.endsWith("_dimension")) {
+          if (!isDimensionElement(e))
+            throw new Error("Invalid dimension geometry")
+          drawDimension({ element: e, mesh, textYAxis: options.textYAxis })
+        } else if (type.endsWith("_text")) {
           if (e.color && (group === "note" || group === "fabrication_note"))
             mesh.color = parseColor(e.color)
           drawText(mesh, e, options.textYAxis)
