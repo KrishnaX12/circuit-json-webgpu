@@ -1,0 +1,84 @@
+[
+  {
+    "type": "pcb_board",
+    "pcb_board_id": "pcb_board_0",
+    "source_board_id": "source_board_0",
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "thickness": 1.4,
+    "num_layers": 4,
+    "width": 58,
+    "height": 48,
+    "material": "fr4",
+    "min_trace_width": 0.12,
+    "min_via_hole_diameter": 0.2,
+    "min_via_pad_diameter": 0.45,
+    "min_via_hole_edge_to_via_hole_edge_clearance": 0.1,
+    "min_trace_to_pad_edge_clearance": 0.1,
+    "min_pad_edge_to_pad_edge_clearance": 0.1,
+    "min_plated_hole_drill_edge_to_drill_edge_clearance": 0.15,
+    "min_board_edge_clearance": 0.2
+  },
+  {
+    "type": "pcb_breakout_point",
+    "pcb_breakout_point_id": "pcb_breakout_point_0",
+    "pcb_group_id": "pcb_group_0",
+    "subcircuit_id": "subcircuit_source_group_2",
+    "source_port_id": "source_port_2",
+    "source_trace_id": "source_trace_0",
+    "source_net_id": "source_net_6",
+    "layer": "top",
+    "x": -4.99999,
+    "y": 3.8000939999999996
+  },
+  {
+    "type": "pcb_trace",
+    "pcb_trace_id": "saved_fanout_pcb_group_0_0",
+    "connection_name": "breakout:pcb_breakout_point_0",
+    "source_trace_id": "source_trace_0",
+    "connectsTo": [
+      "source_trace_0",
+      "pcb_port_2",
+      "pcb_breakout_point_0"
+    ],
+    "route": [
+      {
+        "route_type": "wire",
+        "x": -4.99999,
+        "y": 3.8000939999999996,
+        "width": 0.12,
+        "layer": "top",
+        "start_pcb_port_id": "pcb_port_1"
+      },
+      {
+        "route_type": "wire",
+        "x": -4.99999,
+        "y": 3.4000439999999994,
+        "width": 0.12,
+        "layer": "top",
+        "end_pcb_port_id": "pcb_port_2"
+      }
+    ],
+    "subcircuit_id": "subcircuit_source_group_2"
+  },
+  {
+    "type": "pcb_smtpad",
+    "pcb_smtpad_id": "pcb_smtpad_2",
+    "pcb_component_id": "pcb_component_0",
+    "pcb_port_id": "pcb_port_2",
+    "layer": "top",
+    "shape": "rect",
+    "width": 0.7999984,
+    "height": 0.1999996,
+    "port_hints": [
+      "pin3"
+    ],
+    "is_covered_with_solder_mask": false,
+    "x": -4.99999,
+    "y": 3.4000439999999994,
+    "subcircuit_id": "subcircuit_source_group_2",
+    "pcb_group_id": "pcb_group_0"
+  }
+]
