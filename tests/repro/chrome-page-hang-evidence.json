@@ -1,0 +1,190 @@
+{
+  "captured_at": "2026-10-02T01:28:31.879427+00:00",
+  "browser": "Google Chrome 154.0.8037.58 on macOS 26.6.2",
+  "target": "https://tscircuit.com/seveibar/f1c100s-linux-dev-board#pcb",
+  "pinned_deployment": "https://tscircuit-lu27teb83-tscircuit.vercel.app",
+  "bundle_sha256": "ba794ff40cc67b59842389cff4111bee38faa99d66e33046f30276b0599d0831",
+  "result": "Unchanged full-site controls stop their main-thread heartbeat. Deferring GPUDevice.destroy until onSubmittedWorkDone settles keeps the same failing worker path responsive, with both PostHog and Sentry enabled.",
+  "trials": [
+    {
+      "mode": "on",
+      "run": "pinned-baseline",
+      "observed_seconds": 0.4,
+      "heartbeat_stopped_for_seconds": 1428.5,
+      "last_heartbeat": {
+        "mode": "on",
+        "run": "pinned-baseline",
+        "ticks": 252,
+        "hash": "#pcb",
+        "maxDelay": 343.79999999701977,
+        "longTasks": 2,
+        "maxLongTask": 337,
+        "recorderLoaded": false,
+        "posthogResources": 8,
+        "heapBytes": 112329352,
+        "gpuFailureKind": "scene-rejected",
+        "probeSdkLoaded": true,
+        "probeHasExceptions": true,
+        "sdkAutocapture": true,
+        "probeMethodInstalled": false,
+        "received": 1790903083.328298
+      }
+    },
+    {
+      "mode": "on",
+      "run": "pinned-baseline-2",
+      "observed_seconds": 4.0,
+      "heartbeat_stopped_for_seconds": 598.8,
+      "last_heartbeat": {
+        "mode": "on",
+        "run": "pinned-baseline-2",
+        "ticks": 251,
+        "hash": "#pcb",
+        "maxDelay": 323.19999999925494,
+        "longTasks": 3,
+        "maxLongTask": 329,
+        "recorderLoaded": false,
+        "posthogResources": 7,
+        "heapBytes": 111332882,
+        "gpuFailureKind": "scene-rejected",
+        "probeSdkLoaded": true,
+        "probeHasExceptions": true,
+        "sdkAutocapture": true,
+        "probeMethodInstalled": false,
+        "received": 1790903913.073819
+      }
+    },
+    {
+      "mode": "defer-device-destroy",
+      "run": "exact-patch-1",
+      "observed_seconds": 648.5,
+      "heartbeat_stopped_for_seconds": 0.4,
+      "last_heartbeat": {
+        "mode": "defer-device-destroy",
+        "run": "exact-patch-1",
+        "ticks": 6617,
+        "hash": "#pcb",
+        "maxDelay": 335.0999999977648,
+        "longTasks": 3,
+        "maxLongTask": 344,
+        "recorderLoaded": false,
+        "posthogResources": 9,
+        "heapBytes": 94094699,
+        "gpuFailureKind": "scene-rejected",
+        "probeSdkLoaded": true,
+        "probeHasExceptions": true,
+        "sdkAutocapture": true,
+        "probeMethodInstalled": false,
+        "received": 1790904511.4545128
+      }
+    },
+    {
+      "mode": "defer-device-destroy",
+      "run": "exact-patch-2",
+      "observed_seconds": 520.4,
+      "heartbeat_stopped_for_seconds": 0.3,
+      "last_heartbeat": {
+        "mode": "defer-device-destroy",
+        "run": "exact-patch-2",
+        "ticks": 5506,
+        "hash": "#pcb",
+        "maxDelay": 341.6000000014901,
+        "longTasks": 2,
+        "maxLongTask": 338,
+        "recorderLoaded": false,
+        "posthogResources": 9,
+        "heapBytes": 96431239,
+        "gpuFailureKind": "scene-rejected",
+        "probeSdkLoaded": true,
+        "probeHasExceptions": true,
+        "sdkAutocapture": true,
+        "probeMethodInstalled": false,
+        "received": 1790904511.595663
+      }
+    },
+    {
+      "script": "scripts/repro-chrome-page-hang.py",
+      "mode": "baseline",
+      "observed_seconds": 1.5,
+      "heartbeat_stopped_for_seconds": 285.5,
+      "last_heartbeat": {
+        "mode": "baseline",
+        "ticks": 197,
+        "hash": "#pcb",
+        "posthogLoaded": true,
+        "gpuFailure": true,
+        "received": 1790904226.37611
+      }
+    },
+    {
+      "script": "scripts/repro-chrome-page-hang.py",
+      "mode": "patched",
+      "observed_seconds": 250.4,
+      "heartbeat_stopped_for_seconds": 0.3,
+      "last_heartbeat": {
+        "mode": "patched",
+        "ticks": 2836,
+        "hash": "#pcb",
+        "posthogLoaded": true,
+        "gpuFailure": false,
+        "received": 1790904511.539713
+      }
+    },
+    {
+      "script": "scripts/repro-chrome-page-hang.py",
+      "mode": "no-posthog",
+      "observed_seconds": 324.0,
+      "heartbeat_stopped_for_seconds": 0.2,
+      "last_heartbeat": {
+        "mode": "no-posthog",
+        "ticks": 3312,
+        "hash": "#pcb",
+        "posthogLoaded": true,
+        "gpuFailure": true,
+        "received": 1790904511.711294
+      }
+    },
+    {
+      "script": "scripts/repro-chrome-page-hang.py",
+      "mode": "no-sentry",
+      "observed_seconds": 2.5,
+      "heartbeat_stopped_for_seconds": 305.9,
+      "last_heartbeat": {
+        "mode": "no-sentry",
+        "ticks": 152,
+        "hash": "#pcb",
+        "posthogLoaded": true,
+        "gpuFailure": true,
+        "received": 1790904205.956494
+      }
+    },
+    {
+      "script": "scripts/repro-chrome-page-hang.py",
+      "mode": "no-posthog-init",
+      "observed_seconds": 52.5,
+      "heartbeat_stopped_for_seconds": 0.5,
+      "last_heartbeat": {
+        "mode": "no-posthog-init",
+        "ticks": 824,
+        "hash": "#pcb",
+        "posthogLoaded": false,
+        "gpuFailure": true,
+        "received": 1790904511.399014
+      }
+    }
+  ],
+  "validation": {
+    "unit_tests": "66 pass, 0 fail",
+    "typecheck": "pass",
+    "build": "pass",
+    "format": "pass",
+    "canvas_workaround": "Rendering Engine > Canvas selected; board rendered in Chrome"
+  },
+  "limitations": [
+    "Standalone library shutdown probe compiles 604035 triangles and uploads 27407460 bytes but did not reproduce the full-site freeze. Browser automation timeouts alone were not counted as freeze evidence.",
+    "Some early PostHog comparisons also changed Sentry initialization; those are not used to isolate PostHog. The checked-in script contains separate SDK controls.",
+    "No root cause inside PostHog, Sentry, or Chrome has been proven. Patch is an experimentally validated shutdown mitigation.",
+    "Manually ended diagnostic renderers showing Aw Snap were not counted as spontaneous crashes.",
+    "The pinned reproduction still displays an unrelated rendering diagnostic; it is identical in freezing and patched controls."
+  ]
+}

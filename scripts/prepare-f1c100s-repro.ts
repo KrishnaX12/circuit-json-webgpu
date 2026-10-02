@@ -4,7 +4,7 @@ export {}
 const baseline = Bun.spawnSync([
   "git",
   "show",
-  "6c1414c7464a743190747c99bb8ec504f2ecf646:dist/index.js",
+  "d66c8e1728ae2d107bb9da4fb9d349d279a281ff:dist/index.js",
 ])
 if (baseline.exitCode !== 0) throw new Error(baseline.stderr.toString())
 const response = await fetch(

@@ -11,18 +11,10 @@ self.onmessage = async ({ data }) => {
     const drawer = await CircuitToWebGpuDrawer.create(data.canvas)
     report("Compiling published board")
     drawer.setCircuitJson(data.elements)
-    // pcb-viewer rejects any unsupported geometry diagnostics.
-    if (drawer.diagnostics.length) {
-      report(`Rejecting ${drawer.diagnostics.length} diagnostics; disposing`)
-      drawer.dispose()
-      report("Worker drawer disposed", true)
-      return
-    }
-    drawer.render({
-      transform: { a: 16, b: 0, c: 0, d: -16, e: 600, f: 450 },
-    })
-    await drawer.flush()
-    report(`Rendered successfully: ${JSON.stringify(drawer.stats)}`)
+    // Exercise shutdown with queued geometry uploads, independently of diagnostics.
+    report(`Compiled board: ${JSON.stringify(drawer.stats)}`)
+    drawer.dispose()
+    report("Worker drawer disposed", true)
   } catch (error) {
     report(String(error), true)
   }
