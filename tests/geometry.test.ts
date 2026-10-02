@@ -10,6 +10,7 @@ import {
 import { fixtures, silkscreenGraphics } from "../site/fixtures"
 import large from "./fixtures/am3352-dev-board.circuit.json"
 import breakout from "./fixtures/f1c100s-breakout.circuit.json"
+import museSockets from "./fixtures/muse-socket-plated-holes.circuit.json"
 
 function area(mesh: ReturnType<MeshBuilder["build"]>) {
   let area = 0
@@ -276,4 +277,114 @@ test("keepout fill and stripes preserve holes in concave polygons", () => {
   expect(fillArea).toBeCloseTo(44)
   expect(stripeArea).toBeGreaterThan(0)
   expect(stripeArea).toBeLessThan(fillArea)
+})
+
+function meshBounds(mesh: ReturnType<MeshBuilder["build"]>) {
+  const xs: number[] = [],
+    ys: number[] = []
+  for (let i = 0; i < mesh.vertices.length; i += 8) {
+    xs.push(mesh.vertices[i])
+    ys.push(mesh.vertices[i + 1])
+  }
+  return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+}
+
+test("Muse imported socket pads compile on both copper layers and through the board", () => {
+  const scene = compileCircuitJson(museSockets as any)
+  expect(scene.diagnostics).toEqual([])
+  for (const name of [
+    "top",
+    "bottom",
+    "soldermask_top",
+    "soldermask_bottom",
+    "board",
+    "drill",
+  ]) {
+    const layer = scene.layers.find((l) => l.name === name)!
+    const mesh =
+      name === "board" || name.startsWith("soldermask")
+        ? layer.erase
+        : layer.paint
+    expect(mesh.indices.length).toBeGreaterThan(0)
+    expect([...mesh.vertices].every(Number.isFinite)).toBe(true)
+  }
+  for (const name of ["top", "bottom"]) {
+    const layer = scene.layers.find((l) => l.name === name)!
+    expect(area(layer.paint)).toBeCloseTo(2 * 1.5999968 ** 2)
+    expect(area(layer.erase)).toBeCloseTo(2 * Math.PI * (1.0499852 / 2) ** 2, 2)
+  }
+})
+
+test("rotated pill holes have independent pad and drill rotations and world-space offsets", () => {
+  for (const explicitHoleShape of [false, true]) {
+    const scene = compileCircuitJson([
+      {
+        type: "pcb_plated_hole",
+        pcb_plated_hole_id: "rotated-slot",
+        shape: "rotated_pill_hole_with_rect_pad",
+        ...(explicitHoleShape
+          ? { hole_shape: "rotated_pill", pad_shape: "rect" }
+          : {}),
+        x: 10,
+        y: 20,
+        rect_pad_width: 8,
+        rect_pad_height: 6,
+        rect_ccw_rotation: 90,
+        hole_width: 4,
+        hole_height: 2,
+        hole_ccw_rotation: 0,
+        hole_offset_x: 0.5,
+        hole_offset_y: -0.25,
+        layers: ["top", "inner1", "bottom"],
+      },
+    ] as any)
+    expect(scene.diagnostics).toEqual([])
+    for (const name of ["top", "inner1", "bottom"]) {
+      const layer = scene.layers.find((l) => l.name === name)!
+      expect(meshBounds(layer.paint)).toEqual([7, 13, 16, 24])
+      const drillBounds = meshBounds(layer.erase)
+      // The slot stays horizontal when the rectangular pad rotates vertically.
+      for (const [i, expected] of [8.5, 12.5, 18.75, 20.75].entries())
+        expect(drillBounds[i]).toBeCloseTo(expected, 2)
+      expect(area(layer.paint)).toBeCloseTo(48)
+      expect(area(layer.erase)).toBeCloseTo(4 + Math.PI, 2)
+    }
+    const drill = scene.layers.find((l) => l.name === "drill")!.paint
+    for (const name of ["board", "soldermask_top", "soldermask_bottom"])
+      expect(
+        scene.layers.find((l) => l.name === name)!.erase.vertices.length,
+      ).toBeGreaterThan(0)
+    const erase = scene.layers.find((l) => l.name === "top")!.erase
+    expect(drill.vertices.length).toBe(erase.vertices.length)
+    for (let i = 0; i < drill.vertices.length; i += 8) {
+      expect(drill.vertices[i]).toBe(erase.vertices[i])
+      expect(drill.vertices[i + 1]).toBe(erase.vertices[i + 1])
+    }
+  }
+})
+
+test("rounded rectangular pads stay rectangular while their slots rotate independently", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_plated_hole",
+      pcb_plated_hole_id: "rounded-slot",
+      shape: "rotated_pill_hole_with_rect_pad",
+      hole_shape: "rotated_pill",
+      x: 0,
+      y: 0,
+      rect_pad_width: 8,
+      rect_pad_height: 6,
+      rect_border_radius: 0.5,
+      rect_ccw_rotation: 0,
+      hole_width: 4,
+      hole_height: 2,
+      hole_ccw_rotation: 90,
+      layers: ["top", "bottom"],
+    },
+  ] as any)
+  expect(scene.diagnostics).toEqual([])
+  const layer = scene.layers.find((l) => l.name === "top")!
+  expect(area(layer.paint)).toBeCloseTo(48 - (4 - Math.PI) * 0.5 ** 2, 2)
+  for (const [i, expected] of [-1, 1, -2, 2].entries())
+    expect(meshBounds(layer.erase)[i]).toBeCloseTo(expected, 2)
 })

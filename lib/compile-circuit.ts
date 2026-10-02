@@ -28,6 +28,28 @@ function shape(e: Element, hole = false): Point[][] {
       (r) => expandBrepRing(r.vertices),
     )
   if (e.outline?.length) return [e.outline]
+  if (e.shape === "rotated_pill_hole_with_rect_pad") {
+    // Pad and slot use independent rotations. Hole offsets are board-space
+    // coordinates, as in the reference canvas renderer, not pad-local offsets.
+    const base = center(e)
+    const c = hole
+      ? {
+          x: base.x + (e.hole_offset_x ?? 0),
+          y: base.y + (e.hole_offset_y ?? 0),
+        }
+      : base
+    const width = hole ? e.hole_width : e.rect_pad_width
+    const height = hole ? e.hole_height : e.rect_pad_height
+    return [
+      rectangle(
+        c,
+        width,
+        height,
+        hole ? Math.min(width, height) / 2 : (e.rect_border_radius ?? 0),
+        (hole ? e.hole_ccw_rotation : e.rect_ccw_rotation) ?? 0,
+      ),
+    ]
+  }
   const kind = hole ? (e.hole_shape ?? e.shape) : e.shape
   if (kind === "polygon") return [e.points ?? e.vertices ?? []]
   const base = center(e),

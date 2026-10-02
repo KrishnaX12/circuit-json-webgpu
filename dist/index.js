@@ -617,6 +617,24 @@ function shape(e, hole = false) {
       (r) => expandBrepRing(r.vertices)
     );
   if (e.outline?.length) return [e.outline];
+  if (e.shape === "rotated_pill_hole_with_rect_pad") {
+    const base2 = center(e);
+    const c2 = hole ? {
+      x: base2.x + (e.hole_offset_x ?? 0),
+      y: base2.y + (e.hole_offset_y ?? 0)
+    } : base2;
+    const width2 = hole ? e.hole_width : e.rect_pad_width;
+    const height2 = hole ? e.hole_height : e.rect_pad_height;
+    return [
+      rectangle(
+        c2,
+        width2,
+        height2,
+        hole ? Math.min(width2, height2) / 2 : e.rect_border_radius ?? 0,
+        (hole ? e.hole_ccw_rotation : e.rect_ccw_rotation) ?? 0
+      )
+    ];
+  }
   const kind = hole ? e.hole_shape ?? e.shape : e.shape;
   if (kind === "polygon") return [e.points ?? e.vertices ?? []];
   const base = center(e), rotation = e.rect_ccw_rotation ?? e.ccw_rotation ?? e.rotation ?? 0;

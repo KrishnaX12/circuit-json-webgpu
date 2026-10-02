@@ -1,0 +1,60 @@
+[
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_0",
+    "pcb_component_id": "pcb_component_1",
+    "pcb_port_id": "pcb_port_3",
+    "outer_width": 1.5999968,
+    "outer_height": 1.5999968,
+    "hole_width": 1.0499852,
+    "hole_height": 1.0499852,
+    "shape": "rotated_pill_hole_with_rect_pad",
+    "port_hints": [
+      "unnamed_platedhole1",
+      "pin1"
+    ],
+    "x": -33.43,
+    "y": 26.67,
+    "layers": [
+      "top",
+      "bottom"
+    ],
+    "is_covered_with_solder_mask": false,
+    "subcircuit_id": "subcircuit_source_group_30",
+    "hole_shape": "rotated_pill",
+    "pad_shape": "rect",
+    "hole_ccw_rotation": 270,
+    "rect_ccw_rotation": 270,
+    "rect_pad_width": 1.5999968,
+    "rect_pad_height": 1.5999968
+  },
+  {
+    "type": "pcb_plated_hole",
+    "pcb_plated_hole_id": "pcb_plated_hole_22",
+    "pcb_component_id": "pcb_component_2",
+    "pcb_port_id": "pcb_port_25",
+    "outer_width": 1.5999968,
+    "outer_height": 1.5999968,
+    "hole_width": 1.0499852,
+    "hole_height": 1.0499852,
+    "shape": "rotated_pill_hole_with_rect_pad",
+    "port_hints": [
+      "unnamed_platedhole23",
+      "pin1"
+    ],
+    "x": -10.570000000000002,
+    "y": 26.67,
+    "layers": [
+      "top",
+      "bottom"
+    ],
+    "is_covered_with_solder_mask": false,
+    "subcircuit_id": "subcircuit_source_group_30",
+    "hole_shape": "rotated_pill",
+    "pad_shape": "rect",
+    "hole_ccw_rotation": 270,
+    "rect_ccw_rotation": 270,
+    "rect_pad_width": 1.5999968,
+    "rect_pad_height": 1.5999968
+  }
+]
