@@ -3,7 +3,9 @@ const status = document.querySelector<HTMLElement>("#status")!
 const heartbeat = document.querySelector<HTMLElement>("#heartbeat")!
 const button = document.querySelector<HTMLButtonElement>("#run")!
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!
-const baseline = new URLSearchParams(location.search).has("baseline")
+const params = new URLSearchParams(location.search)
+const baseline = params.has("baseline")
+const probe = params.get("probe")
 let ticks = 0
 let previous = performance.now()
 let maxDelay = 0
@@ -13,6 +15,21 @@ setInterval(() => {
   previous = now
   heartbeat.textContent = `Heartbeat ${++ticks}; max delay ${maxDelay.toFixed(1)} ms`
 }, 100)
+if (probe) {
+  setInterval(() => {
+    void fetch(probe, {
+      method: "POST",
+      body: JSON.stringify({
+        mode: baseline
+          ? "library-shutdown-baseline"
+          : "library-shutdown-patched",
+        ticks,
+        hash: location.hash,
+        maxDelay,
+      }),
+    }).catch(() => {})
+  }, 500)
+}
 status.textContent = baseline ? "Baseline renderer" : "Patched renderer"
 button.onclick = async () => {
   button.disabled = true

@@ -1394,7 +1394,8 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
     this.xRayUniform.destroy();
     this.highlights.destroy();
     this.context.unconfigure();
-    this.device.destroy();
+    const destroyDevice = () => this.device.destroy();
+    void this.device.queue.onSubmittedWorkDone().then(destroyDevice, destroyDevice);
     this.circuit = void 0;
     this.scene = void 0;
   }

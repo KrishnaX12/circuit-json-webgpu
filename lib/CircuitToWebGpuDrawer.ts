@@ -568,7 +568,11 @@ export class CircuitToWebGpuDrawer {
     this.xRayUniform.destroy()
     this.highlights.destroy()
     this.context.unconfigure()
-    this.device.destroy()
+    // Let queued writes finish before device destruction and worker teardown.
+    const destroyDevice = () => this.device.destroy()
+    void this.device.queue
+      .onSubmittedWorkDone()
+      .then(destroyDevice, destroyDevice)
     this.circuit = undefined
     this.scene = undefined
   }
