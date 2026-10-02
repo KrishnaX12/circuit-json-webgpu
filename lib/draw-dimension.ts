@@ -2,6 +2,7 @@ import { parseColor } from "./colors"
 import { MeshBuilder } from "./geometry"
 import { drawText } from "./text/draw-text"
 import type { Point } from "./types"
+import { applyToPoint, rotateDEG } from "transformation-matrix"
 
 type DimensionElement = Record<string, unknown> & {
   arrow_size?: number
@@ -60,22 +61,25 @@ export function drawDimension(params: {
     [
       from,
       addPoints(fromBase, scalePoint(perpendicular, arrowSize / 2)),
-      addPoints(fromBase, scalePoint(perpendicular, strokeWidth / 2)),
-      addPoints(toBase, scalePoint(perpendicular, strokeWidth / 2)),
-      addPoints(toBase, scalePoint(perpendicular, arrowSize / 2)),
-      to,
-      addPoints(toBase, scalePoint(perpendicular, -arrowSize / 2)),
-      addPoints(toBase, scalePoint(perpendicular, -strokeWidth / 2)),
-      addPoints(fromBase, scalePoint(perpendicular, -strokeWidth / 2)),
       addPoints(fromBase, scalePoint(perpendicular, -arrowSize / 2)),
     ],
   ])
+  mesh.polygon([
+    [
+      to,
+      addPoints(toBase, scalePoint(perpendicular, arrowSize / 2)),
+      addPoints(toBase, scalePoint(perpendicular, -arrowSize / 2)),
+    ],
+  ])
+  mesh.line(fromBase, toBase, strokeWidth)
 
   const extensionDirection =
-    element.offset_direction && offsetDistance !== 0
+    element.offset_direction &&
+    (Math.abs(offsetDirection.x) > Number.EPSILON ||
+      Math.abs(offsetDirection.y) > Number.EPSILON)
       ? offsetDirection
       : perpendicular
-  const extensionLength = offsetDistance + 0.5
+  const extensionLength = offsetDistance + arrowSize
   for (const anchor of [element.from, element.to]) {
     mesh.line(
       anchor,
@@ -138,13 +142,14 @@ function getRotatedTextClearance(params: {
     !Number.isFinite(params.rotationDegrees)
   )
     return 0
-  const rotationRadians = (params.rotationDegrees * Math.PI) / 180
   const halfWidth =
     (params.text.length * params.fontSize * CHARACTER_WIDTH_MULTIPLIER) / 2
   const halfHeight = params.fontSize / 2
+  const rotation = rotateDEG(params.rotationDegrees)
+  const horizontalExtent = applyToPoint(rotation, { x: halfWidth, y: 0 })
+  const verticalExtent = applyToPoint(rotation, { x: 0, y: halfHeight })
   const maximumExtension =
-    halfWidth * Math.abs(Math.sin(rotationRadians)) +
-    halfHeight * Math.abs(Math.cos(rotationRadians))
+    Math.abs(horizontalExtent.y) + Math.abs(verticalExtent.y)
   return (
     maximumExtension + params.fontSize * TEXT_INTERSECTION_PADDING_MULTIPLIER
   )

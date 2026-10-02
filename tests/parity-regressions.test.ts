@@ -28,12 +28,30 @@ const report = (): ParityReport => ({
 })
 
 test("unchanged known mismatches pass, improvements pass, worsening by one pixel fails", () => {
+  const base = report()
   const head = report()
-  expect(findParityRegressions(report(), head)).toEqual([])
+  base.results[0].diagnostics = [
+    {
+      elementId: "dimension-1",
+      type: "pcb_note_dimension",
+      message: "Unsupported element type",
+    },
+  ]
+  head.results[0].diagnostics = [...base.results[0].diagnostics]
+  expect(findParityRegressions(base, head)).toEqual([])
   head.results[0].changedPixels = 9
-  expect(findParityRegressions(report(), head)).toEqual([])
+  head.results[0].diagnostics = []
+  expect(findParityRegressions(base, head)).toEqual([])
+  head.results[0].diagnostics = [
+    {
+      elementId: "dimension-1",
+      type: "pcb_note_dimension",
+      message: "New diagnostic",
+    },
+  ]
+  expect(findParityRegressions(base, head)).toHaveLength(1)
   head.results[0].changedPixels = 11
-  expect(findParityRegressions(report(), head)).toHaveLength(1)
+  expect(findParityRegressions(base, head)).toHaveLength(1)
 })
 
 test("a previously passing case cannot become a mismatch", () => {

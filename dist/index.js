@@ -568,7 +568,7 @@ function drawText(mesh, e, yAxis = "up") {
   const mirrored = isFabrication ? false : isNote ? e.is_mirrored_from_top_view ?? e.layer === "bottom" : e.type === "pcb_silkscreen_text" ? e.layer === "bottom" : e.is_mirrored ?? e.layer === "bottom";
   const rotation = isNote || isFabrication ? 0 : e.ccw_rotation ?? 0;
   const sign = yAxis === "up" ? -1 : 1;
-  const transform = (p) => rotate(
+  const transform2 = (p) => rotate(
     { x: c.x + (mirrored ? -p.x : p.x), y: c.y + sign * p.y },
     c,
     -sign * rotation
@@ -590,9 +590,9 @@ function drawText(mesh, e, yAxis = "up") {
       { x: b.minX - p.left, y: b.maxY + p.bottom }
     ];
     fillEvenOdd(mesh, [
-      outer.map(transform),
+      outer.map(transform2),
       ...geometry.glyphGroups.flatMap(
-        (group) => group.map((ring) => ring.map(transform))
+        (group) => group.map((ring) => ring.map(transform2))
       )
     ]);
     return;
@@ -600,9 +600,94 @@ function drawText(mesh, e, yAxis = "up") {
   for (const group of geometry.glyphGroups)
     fillEvenOdd(
       mesh,
-      group.map((ring) => ring.map(transform))
+      group.map((ring) => ring.map(transform2))
     );
 }
+
+// node_modules/transformation-matrix/src/applyToPoint.js
+function applyToPoint(matrix, point) {
+  return Array.isArray(point) ? [
+    matrix.a * point[0] + matrix.c * point[1] + matrix.e,
+    matrix.b * point[0] + matrix.d * point[1] + matrix.f
+  ] : {
+    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f
+  };
+}
+
+// node_modules/transformation-matrix/src/utils.js
+function isUndefined(val) {
+  return typeof val === "undefined";
+}
+
+// node_modules/transformation-matrix/src/translate.js
+function translate(tx, ty = 0) {
+  return {
+    a: 1,
+    c: 0,
+    e: tx,
+    b: 0,
+    d: 1,
+    f: ty
+  };
+}
+
+// node_modules/transformation-matrix/src/transform.js
+function transform(...matrices) {
+  matrices = Array.isArray(matrices[0]) ? matrices[0] : matrices;
+  const multiply = (m1, m2) => {
+    return {
+      a: m1.a * m2.a + m1.c * m2.b,
+      c: m1.a * m2.c + m1.c * m2.d,
+      e: m1.a * m2.e + m1.c * m2.f + m1.e,
+      b: m1.b * m2.a + m1.d * m2.b,
+      d: m1.b * m2.c + m1.d * m2.d,
+      f: m1.b * m2.e + m1.d * m2.f + m1.f
+    };
+  };
+  switch (matrices.length) {
+    case 0:
+      throw new Error("no matrices provided");
+    case 1:
+      return matrices[0];
+    case 2:
+      return multiply(matrices[0], matrices[1]);
+    default: {
+      const [m1, m2, ...rest] = matrices;
+      const m = multiply(m1, m2);
+      return transform(m, ...rest);
+    }
+  }
+}
+
+// node_modules/transformation-matrix/src/rotate.js
+var { cos, sin, PI } = Math;
+function rotate2(angle, cx, cy) {
+  const cosAngle = cos(angle);
+  const sinAngle = sin(angle);
+  const rotationMatrix = {
+    a: cosAngle,
+    c: -sinAngle,
+    e: 0,
+    b: sinAngle,
+    d: cosAngle,
+    f: 0
+  };
+  if (isUndefined(cx) || isUndefined(cy)) {
+    return rotationMatrix;
+  }
+  return transform([
+    translate(cx, cy),
+    rotationMatrix,
+    translate(-cx, -cy)
+  ]);
+}
+function rotateDEG(angle, cx = void 0, cy = void 0) {
+  return rotate2(angle * PI / 180, cx, cy);
+}
+
+// node_modules/transformation-matrix/src/skew.js
+var { tan } = Math;
 
 // lib/draw-dimension.ts
 function isDimensionElement(element) {
@@ -635,18 +720,19 @@ function drawDimension(params) {
     [
       from,
       addPoints(fromBase, scalePoint(perpendicular, arrowSize / 2)),
-      addPoints(fromBase, scalePoint(perpendicular, strokeWidth / 2)),
-      addPoints(toBase, scalePoint(perpendicular, strokeWidth / 2)),
-      addPoints(toBase, scalePoint(perpendicular, arrowSize / 2)),
-      to,
-      addPoints(toBase, scalePoint(perpendicular, -arrowSize / 2)),
-      addPoints(toBase, scalePoint(perpendicular, -strokeWidth / 2)),
-      addPoints(fromBase, scalePoint(perpendicular, -strokeWidth / 2)),
       addPoints(fromBase, scalePoint(perpendicular, -arrowSize / 2))
     ]
   ]);
-  const extensionDirection = element.offset_direction && offsetDistance !== 0 ? offsetDirection : perpendicular;
-  const extensionLength = offsetDistance + 0.5;
+  mesh.polygon([
+    [
+      to,
+      addPoints(toBase, scalePoint(perpendicular, arrowSize / 2)),
+      addPoints(toBase, scalePoint(perpendicular, -arrowSize / 2))
+    ]
+  ]);
+  mesh.line(fromBase, toBase, strokeWidth);
+  const extensionDirection = element.offset_direction && (Math.abs(offsetDirection.x) > Number.EPSILON || Math.abs(offsetDirection.y) > Number.EPSILON) ? offsetDirection : perpendicular;
+  const extensionLength = offsetDistance + arrowSize;
   for (const anchor of [element.from, element.to]) {
     mesh.line(
       anchor,
@@ -693,10 +779,12 @@ function getTextRotation(params) {
 function getRotatedTextClearance(params) {
   if (params.rotationDegrees === void 0 || !Number.isFinite(params.rotationDegrees))
     return 0;
-  const rotationRadians = params.rotationDegrees * Math.PI / 180;
   const halfWidth = params.text.length * params.fontSize * CHARACTER_WIDTH_MULTIPLIER / 2;
   const halfHeight = params.fontSize / 2;
-  const maximumExtension = halfWidth * Math.abs(Math.sin(rotationRadians)) + halfHeight * Math.abs(Math.cos(rotationRadians));
+  const rotation = rotateDEG(params.rotationDegrees);
+  const horizontalExtent = applyToPoint(rotation, { x: halfWidth, y: 0 });
+  const verticalExtent = applyToPoint(rotation, { x: 0, y: halfHeight });
+  const maximumExtension = Math.abs(horizontalExtent.y) + Math.abs(verticalExtent.y);
   return maximumExtension + params.fontSize * TEXT_INTERSECTION_PADDING_MULTIPLIER;
 }
 function normalize(point) {
@@ -706,8 +794,8 @@ function normalize(point) {
 function addPoints(first, second) {
   return { x: first.x + second.x, y: first.y + second.y };
 }
-function scalePoint(point, scale) {
-  return { x: point.x * scale, y: point.y * scale };
+function scalePoint(point, scale2) {
+  return { x: point.x * scale2, y: point.y * scale2 };
 }
 function isPoint(point) {
   return typeof point === "object" && point !== null && "x" in point && typeof point.x === "number" && "y" in point && typeof point.y === "number";
