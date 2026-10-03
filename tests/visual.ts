@@ -230,7 +230,7 @@ try {
     )
     assert.deepEqual(stats.diagnostics, [])
     const image = await snapshot(name)
-    // Independent checks: a board cutout reveals the black clear color; a pour hole
+    // Independent checks: a board cutout uses the drill color; a pour hole
     // reveals the board/bottom copper rather than red top-layer copper.
     const at = (x: number, y: number) => [
       ...image.data.slice(

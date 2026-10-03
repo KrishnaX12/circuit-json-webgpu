@@ -63,7 +63,8 @@ test("cutouts retain pink drill fill while erasing physical layers", () => {
   ])
   expect(scene.diagnostics).toEqual([])
   const drill = scene.layers.find((layer) => layer.name === "drill")!
-  expect(area(drill.paint)).toBeCloseTo(24 + Math.PI * 4 + 8, 1)
+  const cutoutArea = 24 + Math.PI * 4 + 8
+  expect(area(drill.paint)).toBeCloseTo(cutoutArea, 1)
   expect(drill.erase.indices.length).toBe(0)
   expect([...drill.paint.vertices.slice(2, 6)]).toEqual([
     ...new Float32Array([1, 38 / 255, 226 / 255, 1]),
@@ -71,11 +72,24 @@ test("cutouts retain pink drill fill while erasing physical layers", () => {
   for (const name of ["board", "soldermask_top", "soldermask_bottom"])
     expect(
       area(scene.layers.find((layer) => layer.name === name)!.erase),
-    ).toBeCloseTo(24 + Math.PI * 4 + 8, 1)
+    ).toBeCloseTo(cutoutArea, 1)
   expect(
     scene.layers.find((layer) => layer.name === "edge_cuts")!.erase.indices
       .length,
   ).toBe(0)
+})
+test("cutouts honor the configured drill color", () => {
+  const drillColor = [0.2, 0.4, 0.6, 1] as const
+  const scene = compileCircuitJson(fixtures["board-outline-cutout"].elements, {
+    layerColors: { drill: drillColor },
+  })
+  expect(scene.diagnostics).toEqual([])
+  const drill = scene.layers.find((layer) => layer.name === "drill")!
+  expect(area(drill.paint)).toBeCloseTo(96)
+  expect([...drill.paint.vertices.slice(2, 6)]).toEqual([
+    ...new Float32Array(drillColor),
+  ])
+  expect(drill.erase.indices.length).toBe(0)
 })
 test("triangulation preserves polygon holes", () => {
   const mesh = new MeshBuilder()
