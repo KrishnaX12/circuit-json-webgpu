@@ -23,6 +23,60 @@ function area(mesh: ReturnType<MeshBuilder["build"]>) {
   }
   return area
 }
+test("cutouts retain pink drill fill while erasing physical layers", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_board",
+      pcb_board_id: "board",
+      center: { x: 0, y: 0 },
+      width: 30,
+      height: 20,
+      material: "fr4",
+      num_layers: 2,
+      thickness: 1.6,
+    },
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "rect_cutout",
+      shape: "rect",
+      center: { x: -8, y: 0 },
+      width: 4,
+      height: 6,
+    },
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "circle_cutout",
+      shape: "circle",
+      center: { x: 0, y: 0 },
+      radius: 2,
+    },
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "polygon_cutout",
+      shape: "polygon",
+      points: [
+        { x: 5, y: -2 },
+        { x: 9, y: -2 },
+        { x: 7, y: 2 },
+      ],
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  const drill = scene.layers.find((layer) => layer.name === "drill")!
+  expect(area(drill.paint)).toBeCloseTo(24 + Math.PI * 4 + 8, 1)
+  expect(drill.erase.indices.length).toBe(0)
+  expect([...drill.paint.vertices.slice(2, 6)]).toEqual([
+    ...new Float32Array([1, 38 / 255, 226 / 255, 1]),
+  ])
+  for (const name of ["board", "soldermask_top", "soldermask_bottom"])
+    expect(
+      area(scene.layers.find((layer) => layer.name === name)!.erase),
+    ).toBeCloseTo(24 + Math.PI * 4 + 8, 1)
+  expect(
+    scene.layers.find((layer) => layer.name === "edge_cuts")!.erase.indices
+      .length,
+  ).toBe(0)
+})
 test("triangulation preserves polygon holes", () => {
   const mesh = new MeshBuilder()
   mesh.polygon([
