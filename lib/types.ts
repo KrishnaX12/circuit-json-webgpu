@@ -15,6 +15,8 @@ export type RenderOptions = {
   layers?: readonly string[]
   selectedLayer?: string
   hiddenLayerOpacity?: number
+  /** Copper-pour alpha multiplier (0–1, default 1). showCopperPours=false overrides it. */
+  copperPourOpacity?: number
   showCopperPours?: boolean
   /** Board substrate is hidden by default; outlines remain visible. */
   showBoardMaterial?: boolean

@@ -25,7 +25,8 @@ struct VertexOut {
     if (in.selected == 0u) { discard; }
     return vec4f(in.color.rgb, 1);
   }
-  return vec4f(in.color.rgb * in.color.a, in.color.a);
+  let alpha = in.color.a * select(1.0, camera.viewport.z, in.category == 1u);
+  return vec4f(in.color.rgb * alpha, alpha);
 }
 `
 export const compositeShader = /* wgsl */ `

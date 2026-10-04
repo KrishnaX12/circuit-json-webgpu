@@ -896,7 +896,8 @@ struct VertexOut {
     if (in.selected == 0u) { discard; }
     return vec4f(in.color.rgb, 1);
   }
-  return vec4f(in.color.rgb * in.color.a, in.color.a);
+  let alpha = in.color.a * select(1.0, camera.viewport.z, in.category == 1u);
+  return vec4f(in.color.rgb * alpha, alpha);
 }
 `
 );
@@ -1184,6 +1185,7 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
       throw new Error("Invalid camera or canvas dimensions");
     if (width > this.device.limits.maxTextureDimension2D || height > this.device.limits.maxTextureDimension2D)
       throw new Error("Canvas exceeds GPU texture limits");
+    const copperPourOpacity = o.showCopperPours === false ? 0 : Number.isFinite(o.copperPourOpacity) ? Math.max(0, Math.min(1, o.copperPourOpacity)) : 1;
     this.resize(width, height);
     this.device.queue.writeBuffer(
       this.uniform,
@@ -1199,7 +1201,7 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
         0,
         width,
         height,
-        o.showCopperPours === false ? 0 : 1,
+        copperPourOpacity,
         0
       ])
     );
@@ -1220,7 +1222,7 @@ var CircuitToWebGpuDrawer = class _CircuitToWebGpuDrawer {
           0,
           width,
           height,
-          o.showCopperPours === false ? 0 : 1,
+          copperPourOpacity,
           1
         ])
       );
