@@ -1,3 +1,4 @@
+import { checkCopperPourOpacity } from "./check-copper-pour-opacity"
 import { xRayFixtures } from "./x-ray-fixture"
 import { checkXRay } from "./check-x-ray"
 import {
@@ -71,6 +72,7 @@ Object.assign(window, {
     renderFixture,
     checkBoardVisibility,
     checkXRay,
+    checkCopperPourOpacity,
     renderLarge,
     drawer,
     names: Object.keys(fixtures),
@@ -89,6 +91,7 @@ declare global {
     gpuTest: {
       checkBoardVisibility: typeof checkBoardVisibility
       checkXRay: typeof checkXRay
+      checkCopperPourOpacity: typeof checkCopperPourOpacity
       renderFixture: typeof renderFixture
       renderLarge: typeof renderLarge
       drawer: CircuitToWebGpuDrawer
