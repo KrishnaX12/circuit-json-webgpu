@@ -1,4 +1,5 @@
-import { readFileSync, appendFileSync } from "node:fs"
+import { appendFileSync, readFileSync } from "node:fs"
+import type { Diagnostic } from "../../lib/types"
 import type { ComparisonResult, ReferenceTest } from "./types"
 
 export type ParityReport = {
@@ -11,6 +12,33 @@ export type ParityReport = {
   referenceFailed: number
   results: ComparisonResult[]
   referenceTests: ReferenceTest[]
+}
+
+function getDiagnosticKey(diagnostic: Diagnostic): string {
+  return JSON.stringify([
+    diagnostic.elementId,
+    diagnostic.type,
+    diagnostic.message,
+  ])
+}
+
+function currentDiagnosticsAreSubsetOfBase({
+  baseDiagnostics,
+  currentDiagnostics,
+}: {
+  baseDiagnostics: Diagnostic[] | undefined
+  currentDiagnostics: Diagnostic[] | undefined
+}): boolean {
+  const unmatchedBaseDiagnosticKeys = (baseDiagnostics ?? []).map(
+    getDiagnosticKey,
+  )
+  for (const diagnostic of currentDiagnostics ?? []) {
+    const diagnosticKey = getDiagnosticKey(diagnostic)
+    const matchingBaseIndex = unmatchedBaseDiagnosticKeys.indexOf(diagnosticKey)
+    if (matchingBaseIndex === -1) return false
+    unmatchedBaseDiagnosticKeys.splice(matchingBaseIndex, 1)
+  }
+  return true
 }
 
 const indexCases = (results: ComparisonResult[]) => {
@@ -54,8 +82,8 @@ export function findParityRegressions(
     head.snapshots.length !== head.renderCalls
   )
     failures.push("Feature snapshots failed or are missing")
-  const previous = indexCases(base.results),
-    current = indexCases(head.results)
+  const previous = indexCases(base.results)
+  const current = indexCases(head.results)
   for (const key of previous.keys())
     if (!current.has(key)) failures.push(`Missing comparison: ${key}`)
   for (const [key, result] of current) {
@@ -86,7 +114,10 @@ export function findParityRegressions(
       !before ||
       before.status !== "mismatch" ||
       result.changedPixels! > (before.changedPixels ?? -1) ||
-      JSON.stringify(result.diagnostics) !== JSON.stringify(before.diagnostics)
+      !currentDiagnosticsAreSubsetOfBase({
+        baseDiagnostics: before.diagnostics,
+        currentDiagnostics: result.diagnostics,
+      })
     )
       failures.push(`New or worsened mismatch: ${label}`)
   }

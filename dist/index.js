@@ -246,6 +246,66 @@ function drawKeepout(mesh, rings) {
   mesh.color = copperColor;
 }
 
+// lib/colors.ts
+var rgb = (r, g, b) => [
+  r / 255,
+  g / 255,
+  b / 255,
+  1
+];
+var DEFAULT_LAYER_COLORS = {
+  board: rgb(70, 72, 72),
+  top: rgb(200, 52, 52),
+  bottom: rgb(77, 127, 196),
+  inner1: rgb(127, 200, 127),
+  inner2: rgb(206, 125, 44),
+  inner3: rgb(79, 203, 203),
+  inner4: rgb(219, 98, 139),
+  inner5: rgb(167, 165, 198),
+  inner6: rgb(40, 204, 217),
+  inner7: rgb(232, 178, 167),
+  inner8: rgb(242, 237, 161),
+  drill: rgb(255, 38, 226),
+  top_silkscreen: rgb(242, 237, 161),
+  bottom_silkscreen: rgb(242, 237, 161),
+  soldermask_top: rgb(12, 55, 33),
+  soldermask_bottom: rgb(12, 55, 33),
+  top_fabrication: [1, 1, 1, 0.5],
+  bottom_fabrication: [1, 1, 1, 0.5],
+  top_notes: rgb(89, 148, 220),
+  bottom_notes: rgb(89, 148, 220),
+  top_courtyard: rgb(255, 0, 245),
+  bottom_courtyard: rgb(38, 233, 255),
+  edge_cuts: rgb(208, 210, 205)
+};
+var normalizeLayer = (layer) => layer.replace(/_copper$/, "");
+function parseColor(value) {
+  const hex = value.match(/^#([0-9a-f]{3,8})$/i)?.[1];
+  if (hex) {
+    const full = hex.length <= 4 ? [...hex].map((c) => c + c).join("") : hex;
+    if (full.length !== 6 && full.length !== 8)
+      throw new Error(`Unsupported color: ${value}`);
+    return [
+      parseInt(full.slice(0, 2), 16) / 255,
+      parseInt(full.slice(2, 4), 16) / 255,
+      parseInt(full.slice(4, 6), 16) / 255,
+      full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1
+    ];
+  }
+  const match = value.match(/^rgba?\(([^)]+)\)$/);
+  if (match) {
+    const channels = match[1].split(",").map((v) => Number(v.trim()));
+    if ((channels.length === 3 || channels.length === 4) && channels.every(Number.isFinite))
+      return [
+        channels[0] / 255,
+        channels[1] / 255,
+        channels[2] / 255,
+        channels[3] ?? 1
+      ];
+  }
+  throw new Error(`Unsupported color: ${value}`);
+}
+
 // lib/text/fill-even-odd.ts
 function contains(ring, p) {
   let inside = false;
@@ -271,7 +331,7 @@ function fillEvenOdd(mesh, rings) {
     }
 }
 
-// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetLayout.ts
+// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetLayout.ts
 import {
   glyphAdvanceRatio,
   kerningRatio,
@@ -316,7 +376,7 @@ function getAlphabetLayout(text, fontSize) {
   };
 }
 
-// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetOutlineGroups.ts
+// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetOutlineGroups.ts
 import glyphOutlineAlphabet from "@tscircuit/alphabet/outline-polygons";
 function getAlphabetOutlineGroups(params) {
   const { line, fontSize, startX, startY } = params;
@@ -343,7 +403,7 @@ function getAlphabetOutlineGroups(params) {
   return groups;
 }
 
-// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getPolygonBounds.ts
+// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getPolygonBounds.ts
 function getPolygonBounds(polygons) {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -363,7 +423,7 @@ function getPolygonBounds(polygons) {
   return { minX, minY, maxX, maxY };
 }
 
-// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getTextStartPosition.ts
+// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getTextStartPosition.ts
 function getTextGeometry(alignment, layout, fontSize) {
   const baseLinePlacements = getBaseLinePlacements(alignment, layout);
   const baseGlyphGroups = getGlyphGroupsForLinePlacements(
@@ -508,7 +568,7 @@ function drawText(mesh, e, yAxis = "up") {
   const mirrored = isFabrication ? false : isNote ? e.is_mirrored_from_top_view ?? e.layer === "bottom" : e.type === "pcb_silkscreen_text" ? e.layer === "bottom" : e.is_mirrored ?? e.layer === "bottom";
   const rotation = isNote || isFabrication ? 0 : e.ccw_rotation ?? 0;
   const sign = yAxis === "up" ? -1 : 1;
-  const transform = (p) => rotate(
+  const transform2 = (p) => rotate(
     { x: c.x + (mirrored ? -p.x : p.x), y: c.y + sign * p.y },
     c,
     -sign * rotation
@@ -530,9 +590,9 @@ function drawText(mesh, e, yAxis = "up") {
       { x: b.minX - p.left, y: b.maxY + p.bottom }
     ];
     fillEvenOdd(mesh, [
-      outer.map(transform),
+      outer.map(transform2),
       ...geometry.glyphGroups.flatMap(
-        (group) => group.map((ring) => ring.map(transform))
+        (group) => group.map((ring) => ring.map(transform2))
       )
     ]);
     return;
@@ -540,68 +600,288 @@ function drawText(mesh, e, yAxis = "up") {
   for (const group of geometry.glyphGroups)
     fillEvenOdd(
       mesh,
-      group.map((ring) => ring.map(transform))
+      group.map((ring) => ring.map(transform2))
     );
 }
 
-// lib/colors.ts
-var rgb = (r, g, b) => [
-  r / 255,
-  g / 255,
-  b / 255,
-  1
-];
-var DEFAULT_LAYER_COLORS = {
-  board: rgb(70, 72, 72),
-  top: rgb(200, 52, 52),
-  bottom: rgb(77, 127, 196),
-  inner1: rgb(127, 200, 127),
-  inner2: rgb(206, 125, 44),
-  inner3: rgb(79, 203, 203),
-  inner4: rgb(219, 98, 139),
-  inner5: rgb(167, 165, 198),
-  inner6: rgb(40, 204, 217),
-  inner7: rgb(232, 178, 167),
-  inner8: rgb(242, 237, 161),
-  drill: rgb(255, 38, 226),
-  top_silkscreen: rgb(242, 237, 161),
-  bottom_silkscreen: rgb(242, 237, 161),
-  soldermask_top: rgb(12, 55, 33),
-  soldermask_bottom: rgb(12, 55, 33),
-  top_fabrication: [1, 1, 1, 0.5],
-  bottom_fabrication: [1, 1, 1, 0.5],
-  top_notes: rgb(89, 148, 220),
-  bottom_notes: rgb(89, 148, 220),
-  top_courtyard: rgb(255, 0, 245),
-  bottom_courtyard: rgb(38, 233, 255),
-  edge_cuts: rgb(208, 210, 205)
-};
-var normalizeLayer = (layer) => layer.replace(/_copper$/, "");
-function parseColor(value) {
-  const hex = value.match(/^#([0-9a-f]{3,8})$/i)?.[1];
-  if (hex) {
-    const full = hex.length <= 4 ? [...hex].map((c) => c + c).join("") : hex;
-    if (full.length !== 6 && full.length !== 8)
-      throw new Error(`Unsupported color: ${value}`);
-    return [
-      parseInt(full.slice(0, 2), 16) / 255,
-      parseInt(full.slice(2, 4), 16) / 255,
-      parseInt(full.slice(4, 6), 16) / 255,
-      full.length === 8 ? parseInt(full.slice(6), 16) / 255 : 1
-    ];
+// ../circuit-json-webgpu/node_modules/@tscircuit/math-utils/dist/chunk-5J3PCV4D.js
+function midpoint(p1, p2) {
+  return {
+    x: (p1.x + p2.x) / 2,
+    y: (p1.y + p2.y) / 2
+  };
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/applyToPoint.js
+function applyToPoint(matrix, point) {
+  return Array.isArray(point) ? [
+    matrix.a * point[0] + matrix.c * point[1] + matrix.e,
+    matrix.b * point[0] + matrix.d * point[1] + matrix.f
+  ] : {
+    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f
+  };
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/utils.js
+function isUndefined(val) {
+  return typeof val === "undefined";
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/translate.js
+function translate(tx, ty = 0) {
+  return {
+    a: 1,
+    c: 0,
+    e: tx,
+    b: 0,
+    d: 1,
+    f: ty
+  };
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/transform.js
+function transform(...matrices) {
+  matrices = Array.isArray(matrices[0]) ? matrices[0] : matrices;
+  const multiply = (m1, m2) => {
+    return {
+      a: m1.a * m2.a + m1.c * m2.b,
+      c: m1.a * m2.c + m1.c * m2.d,
+      e: m1.a * m2.e + m1.c * m2.f + m1.e,
+      b: m1.b * m2.a + m1.d * m2.b,
+      d: m1.b * m2.c + m1.d * m2.d,
+      f: m1.b * m2.e + m1.d * m2.f + m1.f
+    };
+  };
+  switch (matrices.length) {
+    case 0:
+      throw new Error("no matrices provided");
+    case 1:
+      return matrices[0];
+    case 2:
+      return multiply(matrices[0], matrices[1]);
+    default: {
+      const [m1, m2, ...rest] = matrices;
+      const m = multiply(m1, m2);
+      return transform(m, ...rest);
+    }
   }
-  const match = value.match(/^rgba?\(([^)]+)\)$/);
-  if (match) {
-    const channels = match[1].split(",").map((v) => Number(v.trim()));
-    if ((channels.length === 3 || channels.length === 4) && channels.every(Number.isFinite))
-      return [
-        channels[0] / 255,
-        channels[1] / 255,
-        channels[2] / 255,
-        channels[3] ?? 1
-      ];
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/rotate.js
+var { cos, sin, PI } = Math;
+function rotate2(angle, cx, cy) {
+  const cosAngle = cos(angle);
+  const sinAngle = sin(angle);
+  const rotationMatrix = {
+    a: cosAngle,
+    c: -sinAngle,
+    e: 0,
+    b: sinAngle,
+    d: cosAngle,
+    f: 0
+  };
+  if (isUndefined(cx) || isUndefined(cy)) {
+    return rotationMatrix;
   }
-  throw new Error(`Unsupported color: ${value}`);
+  return transform([
+    translate(cx, cy),
+    rotationMatrix,
+    translate(-cx, -cy)
+  ]);
+}
+function rotateDEG(angle, cx = void 0, cy = void 0) {
+  return rotate2(angle * PI / 180, cx, cy);
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/scale.js
+function scale(sx, sy = void 0, cx = void 0, cy = void 0) {
+  if (isUndefined(sy)) sy = sx;
+  const scaleMatrix = {
+    a: sx,
+    c: 0,
+    e: 0,
+    b: 0,
+    d: sy,
+    f: 0
+  };
+  if (isUndefined(cx) || isUndefined(cy)) {
+    return scaleMatrix;
+  }
+  return transform([
+    translate(cx, cy),
+    scaleMatrix,
+    translate(-cx, -cy)
+  ]);
+}
+
+// ../circuit-json-webgpu/node_modules/transformation-matrix/src/skew.js
+var { tan } = Math;
+
+// lib/pcb-dimension/get-pcb-dimension-geometry.ts
+var TEXT_OFFSET_MULTIPLIER = 1.5;
+var CHARACTER_WIDTH_MULTIPLIER = 0.6;
+var TEXT_INTERSECTION_PADDING_MULTIPLIER = 0.3;
+function getPcbDimensionGeometry({
+  pcbDimension
+}) {
+  const dimensionDirection = normalizeVector({
+    x: pcbDimension.to.x - pcbDimension.from.x,
+    y: pcbDimension.to.y - pcbDimension.from.y
+  });
+  const perpendicularDirection = applyToPoint(rotateDEG(90), dimensionDirection);
+  const offsetDirection = normalizeVector(
+    pcbDimension.offset_direction ?? { x: 0, y: 0 }
+  );
+  const offsetDistance = pcbDimension.offset_distance ?? 0;
+  const offsetVector = scaleVector(offsetDirection, offsetDistance);
+  const dimensionStart = translatePoint(pcbDimension.from, offsetVector);
+  const dimensionEnd = translatePoint(pcbDimension.to, offsetVector);
+  const arrowSize = pcbDimension.arrow_size ?? 1;
+  const dimensionStartArrowBase = translatePoint(
+    dimensionStart,
+    scaleVector(dimensionDirection, arrowSize)
+  );
+  const dimensionEndArrowBase = translatePoint(
+    dimensionEnd,
+    scaleVector(dimensionDirection, -arrowSize)
+  );
+  const arrowHalfWidthVector = scaleVector(
+    perpendicularDirection,
+    arrowSize / 2
+  );
+  const negativeArrowHalfWidthVector = scaleVector(
+    perpendicularDirection,
+    -arrowSize / 2
+  );
+  const extensionDirection = hasDirection(offsetDirection) ? offsetDirection : perpendicularDirection;
+  const extensionVector = scaleVector(
+    extensionDirection,
+    offsetDistance + arrowSize
+  );
+  const dimensionMidpoint = translatePoint(
+    midpoint(pcbDimension.from, pcbDimension.to),
+    offsetVector
+  );
+  const fontSize = pcbDimension.font_size ?? 1;
+  const textOffsetDistance = arrowSize * TEXT_OFFSET_MULTIPLIER + getRotatedTextClearance({
+    fontSize,
+    text: pcbDimension.text ?? "",
+    textCcwRotationDegrees: pcbDimension.text_ccw_rotation
+  });
+  return {
+    arrowPolygons: [
+      [
+        dimensionStart,
+        translatePoint(dimensionStartArrowBase, arrowHalfWidthVector),
+        translatePoint(dimensionStartArrowBase, negativeArrowHalfWidthVector)
+      ],
+      [
+        dimensionEnd,
+        translatePoint(dimensionEndArrowBase, arrowHalfWidthVector),
+        translatePoint(dimensionEndArrowBase, negativeArrowHalfWidthVector)
+      ]
+    ],
+    dimensionLine: {
+      start: dimensionStartArrowBase,
+      end: dimensionEndArrowBase,
+      width: arrowSize / 5
+    },
+    extensionLines: [
+      {
+        start: pcbDimension.from,
+        end: translatePoint(pcbDimension.from, extensionVector)
+      },
+      {
+        start: pcbDimension.to,
+        end: translatePoint(pcbDimension.to, extensionVector)
+      }
+    ],
+    label: pcbDimension.text ? {
+      anchorPosition: translatePoint(
+        dimensionMidpoint,
+        scaleVector(perpendicularDirection, textOffsetDistance)
+      ),
+      ccwRotationDegrees: getLabelCcwRotationDegrees({
+        dimensionDirection,
+        requestedCcwRotationDegrees: pcbDimension.text_ccw_rotation
+      }),
+      fontSize,
+      text: pcbDimension.text
+    } : void 0
+  };
+}
+function getLabelCcwRotationDegrees({
+  dimensionDirection,
+  requestedCcwRotationDegrees
+}) {
+  let dimensionCcwRotationDegrees = Math.atan2(dimensionDirection.y, dimensionDirection.x) * 180 / Math.PI;
+  if (dimensionCcwRotationDegrees > 90 || dimensionCcwRotationDegrees < -90) {
+    dimensionCcwRotationDegrees += 180;
+  }
+  return dimensionCcwRotationDegrees + (requestedCcwRotationDegrees ?? 0);
+}
+function getRotatedTextClearance({
+  fontSize,
+  text,
+  textCcwRotationDegrees
+}) {
+  if (textCcwRotationDegrees === void 0 || !Number.isFinite(textCcwRotationDegrees)) {
+    return 0;
+  }
+  const halfWidth = text.length * fontSize * CHARACTER_WIDTH_MULTIPLIER / 2;
+  const halfHeight = fontSize / 2;
+  const textCcwRotationTransform = rotateDEG(textCcwRotationDegrees);
+  const horizontalExtentVector = applyToPoint(textCcwRotationTransform, {
+    x: halfWidth,
+    y: 0
+  });
+  const verticalExtentVector = applyToPoint(textCcwRotationTransform, {
+    x: 0,
+    y: halfHeight
+  });
+  return Math.abs(horizontalExtentVector.y) + Math.abs(verticalExtentVector.y) + fontSize * TEXT_INTERSECTION_PADDING_MULTIPLIER;
+}
+function normalizeVector(vector) {
+  const vectorLength = Math.hypot(vector.x, vector.y) || 1;
+  return applyToPoint(scale(1 / vectorLength), vector);
+}
+function scaleVector(vector, scaleFactor) {
+  return applyToPoint(scale(scaleFactor), vector);
+}
+function translatePoint(point, translation) {
+  return applyToPoint(translate(translation.x, translation.y), point);
+}
+function hasDirection(direction) {
+  return Math.abs(direction.x) > Number.EPSILON || Math.abs(direction.y) > Number.EPSILON;
+}
+
+// lib/pcb-dimension/draw-pcb-dimension.ts
+function drawPcbDimension({
+  mesh,
+  pcbDimension,
+  textYAxis
+}) {
+  if (pcbDimension.color) mesh.color = parseColor(pcbDimension.color);
+  const { arrowPolygons, dimensionLine, extensionLines, label } = getPcbDimensionGeometry({ pcbDimension });
+  for (const arrowPolygon of arrowPolygons) mesh.polygon([arrowPolygon]);
+  mesh.line(dimensionLine.start, dimensionLine.end, dimensionLine.width);
+  for (const extensionLine of extensionLines) {
+    mesh.line(extensionLine.start, extensionLine.end, dimensionLine.width);
+  }
+  if (!label) return;
+  drawText(
+    mesh,
+    {
+      anchor_alignment: "center",
+      anchor_position: label.anchorPosition,
+      ccw_rotation: label.ccwRotationDegrees,
+      font_size: label.fontSize,
+      text: label.text,
+      type: "pcb_dimension_text"
+    },
+    textYAxis
+  );
 }
 
 // lib/compile-circuit.ts
@@ -768,8 +1048,15 @@ function compileCircuitJson(elements, options = {}) {
           note: "notes",
           user_note: "notes"
         }[group];
-        const layer = `${e.layer ?? "top"}_${suffix}`, mesh = get(layer, index);
-        if (type.endsWith("_text")) {
+        const layer = `${e.layer ?? "top"}_${suffix}`;
+        const mesh = get(layer, index);
+        if (input.type === "pcb_note_dimension" || input.type === "pcb_fabrication_note_dimension") {
+          drawPcbDimension({
+            mesh,
+            pcbDimension: input,
+            textYAxis: options.textYAxis
+          });
+        } else if (type.endsWith("_text")) {
           if (e.color && (group === "note" || group === "fabrication_note"))
             mesh.color = parseColor(e.color);
           drawText(mesh, e, options.textYAxis);

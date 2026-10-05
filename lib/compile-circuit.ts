@@ -4,6 +4,7 @@ import {
   hasWireTaper,
 } from "./get-wire-taper-polygon"
 import { drawKeepout } from "./draw-keepout"
+import { drawPcbDimension } from "./pcb-dimension/draw-pcb-dimension"
 import { drawText } from "./text/draw-text"
 import { DEFAULT_LAYER_COLORS, normalizeLayer, parseColor } from "./colors"
 import {
@@ -239,9 +240,18 @@ export function compileCircuitJson(
           note: "notes",
           user_note: "notes",
         }[group]!
-        const layer = `${e.layer ?? "top"}_${suffix}`,
-          mesh = get(layer, index)
-        if (type.endsWith("_text")) {
+        const layer = `${e.layer ?? "top"}_${suffix}`
+        const mesh = get(layer, index)
+        if (
+          input.type === "pcb_note_dimension" ||
+          input.type === "pcb_fabrication_note_dimension"
+        ) {
+          drawPcbDimension({
+            mesh,
+            pcbDimension: input,
+            textYAxis: options.textYAxis,
+          })
+        } else if (type.endsWith("_text")) {
           if (e.color && (group === "note" || group === "fabrication_note"))
             mesh.color = parseColor(e.color)
           drawText(mesh, e, options.textYAxis)
