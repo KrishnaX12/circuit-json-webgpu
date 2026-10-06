@@ -261,7 +261,7 @@ try {
     )
     assert.deepEqual(stats.diagnostics, [])
     const image = await snapshot(name)
-    // Independent checks: a board cutout reveals the black clear color; a pour hole
+    // Independent checks: a board cutout uses the pink drill color; a pour hole
     // reveals the board/bottom copper rather than red top-layer copper.
     const at = (x: number, y: number) => [
       ...image.data.slice(
@@ -332,7 +332,7 @@ try {
       )
     }
     if (name === "board-outline-cutout")
-      assert.deepEqual(at(400, 300), [0, 0, 0])
+      assert.deepEqual(at(400, 300), [255, 38, 226])
     if (name === "pour-holes-and-arcs") {
       assert(at(200, 300)[0] > 150)
       assert(at(400, 280)[0] < 100)

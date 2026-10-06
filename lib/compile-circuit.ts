@@ -338,9 +338,12 @@ export function compileCircuitJson(
       if (layers.includes(side))
         get(`soldermask_${side}`, index, true).polygon(rings)
   }
-  for (const { rings, index } of cutouts)
+  for (const { rings, index } of cutouts) {
+    get("drill", index).polygon(rings)
     for (const name of builders.keys())
-      if (name !== "edge_cuts") get(name, index, true).polygon(rings)
+      if (name !== "edge_cuts" && name !== "drill")
+        get(name, index, true).polygon(rings)
+  }
   const layers = [...builders].map(([name, mesh]) => ({
     name,
     paint: mesh.paint.build(),

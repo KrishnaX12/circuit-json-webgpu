@@ -23,6 +23,75 @@ function area(mesh: ReturnType<MeshBuilder["build"]>) {
   }
   return area
 }
+// Repro: <board width="10mm" height="10mm">
+//   <cutout shape="rect" width="6mm" height="4mm" />
+// </board>
+test("rectangular cutouts paint the drill layer without erasing their fill", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_board",
+      pcb_board_id: "board",
+      center: { x: 0, y: 0 },
+      width: 10,
+      height: 10,
+      thickness: 1.6,
+      num_layers: 2,
+      material: "fr4",
+    },
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "cutout",
+      shape: "rect",
+      center: { x: 0, y: 0 },
+      width: 6,
+      height: 4,
+    },
+  ])
+  const drill = scene.layers.find((layer) => layer.name === "drill")!
+  expect(scene.diagnostics).toEqual([])
+  expect(drill).toBeDefined()
+  expect(area(drill.paint)).toBeCloseTo(24)
+  expect([...drill.paint.vertices.slice(2, 6)]).toEqual([
+    ...new Float32Array([1, 38 / 255, 226 / 255, 1]),
+  ])
+  expect(drill.erase.indices.length).toBe(0)
+  expect(
+    area(scene.layers.find((layer) => layer.name === "board")!.erase),
+  ).toBeCloseTo(24)
+})
+
+test("cutouts still erase overlapping copper", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_cutout",
+      pcb_cutout_id: "cutout",
+      shape: "rect",
+      center: { x: 0, y: 0 },
+      width: 6,
+      height: 4,
+    },
+    {
+      type: "pcb_smtpad",
+      pcb_smtpad_id: "pad",
+      pcb_component_id: "component",
+      shape: "rect",
+      layer: "top",
+      x: 0,
+      y: 0,
+      width: 8,
+      height: 6,
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(
+    area(scene.layers.find((layer) => layer.name === "top")!.erase),
+  ).toBeCloseTo(24)
+  const drill = scene.layers.find((layer) => layer.name === "drill")!
+  expect(drill).toBeDefined()
+  expect(area(drill.paint)).toBeCloseTo(24)
+  expect(drill.erase.indices.length).toBe(0)
+})
+
 test("triangulation preserves polygon holes", () => {
   const mesh = new MeshBuilder()
   mesh.polygon([
