@@ -18,7 +18,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsup lib/index.ts --format esm --dts --clean",
-    "typecheck": "bun tests/parity/prepare-upstream.ts && tsc --noEmit",
+    "typecheck": "bun tests/parity/prepare-upstream.ts && tsc --noEmit && tsc --noEmit -p tsconfig.reference.json",
     "test": "bun test tests/dispose.test.ts tests/geometry.test.ts tests/text.test.ts tests/upstream-integrity.test.ts tests/parity-comparison.test.ts tests/parity-prepare.test.ts tests/parity-regressions.test.ts tests/parity-removed-diagnostics.test.ts tests/teardrop-geometry.test.ts tests/ti-drv8307evm-fabrication-dimensions.test.ts",
     "test:visual": "bun tests/visual.ts",
     "snapshots:update": "UPDATE_SNAPSHOTS=1 bun tests/visual.ts",
@@ -40,7 +40,7 @@
     "earcut": "^3.0.2"
   },
   "peerDependencies": {
-    "circuit-json": ">=0.0.469"
+    "circuit-json": ">=0.0.518"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
@@ -48,7 +48,8 @@
     "@types/earcut": "^3.0.0",
     "@types/pngjs": "^6.0.5",
     "@webgpu/types": "^0.1.64",
-    "circuit-json": "^0.0.501",
+    "circuit-json": "^0.0.518",
+    "circuit-json-reference": "npm:circuit-json@0.0.501",
     "pixelmatch": "^7.1.0",
     "playwright": "1.63.0",
     "pngjs": "^7.0.0",

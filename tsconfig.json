@@ -32,5 +32,9 @@
     "tests/**/*.ts",
     "site",
     "scripts"
+  ],
+  "exclude": [
+    "tests/upstream/**",
+    "tests/parity/capture.ts"
   ]
 }

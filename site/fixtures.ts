@@ -1,3 +1,4 @@
+import fabricationPathFill from "../tests/fixtures/fabrication-path-fill.circuit.json"
 import { teardropDemo } from "./teardrop-demo"
 import type { CircuitJson, RenderOptions } from "../lib"
 export type Fixture = { elements: CircuitJson; options?: RenderOptions }
@@ -408,6 +409,10 @@ export const fixtures: Record<string, Fixture> = {
   "soldermask-openings": {
     elements: [...rectPads, ...holes.slice(1)] as CircuitJson,
     options: { showSolderMask: true },
+  },
+  "fabrication-path-fill": {
+    elements: fabricationPathFill as CircuitJson,
+    options: { showFabricationNotes: true, hiddenLayerOpacity: 1 },
   },
   annotations: {
     elements: annotations as CircuitJson,
