@@ -37,7 +37,8 @@
   },
   "dependencies": {
     "@tscircuit/alphabet": "^0.0.25",
-    "earcut": "^3.0.2"
+    "earcut": "^3.0.2",
+    "polygon-clipping": "^0.15.7"
   },
   "peerDependencies": {
     "circuit-json": ">=0.0.518"
