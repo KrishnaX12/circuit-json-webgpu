@@ -1,4 +1,5 @@
 import earcut from "earcut"
+import polygonClipping, { type Polygon } from "polygon-clipping"
 import type { Color, Mesh, Point } from "./types"
 
 /** Tessellation is camera-independent and runs only when circuit data changes. */
@@ -36,17 +37,7 @@ export class MeshBuilder {
   }
   line(a: Point, b: Point, width: number) {
     if (!(width > 0)) return
-    const angle = Math.atan2(b.y - a.y, b.x - a.x),
-      r = width / 2
-    const points: Point[] = []
-    for (let i = 0; i <= 12; i++) {
-      const t = angle + Math.PI / 2 + (i * Math.PI) / 12
-      points.push({ x: a.x + r * Math.cos(t), y: a.y + r * Math.sin(t) })
-    }
-    for (let i = 0; i <= 12; i++) {
-      const t = angle - Math.PI / 2 + (i * Math.PI) / 12
-      points.push({ x: b.x + r * Math.cos(t), y: b.y + r * Math.sin(t) })
-    }
+    const points = capsule(a, b, width)
     this.polygon([points])
   }
   path(points: Point[], width: number, closed = false) {
@@ -54,12 +45,47 @@ export class MeshBuilder {
       this.line(points[i - 1], points[i], width)
     if (closed && points.length > 2) this.line(points.at(-1)!, points[0], width)
   }
+  fabricationPath(points: Point[], width: number, filled: boolean) {
+    if (points.length < 2) return
+    const polygons: Polygon[] = []
+    if (filled && points.length >= 3)
+      polygons.push([points.map((p) => [p.x, p.y])])
+    if (width > 0) {
+      const route = filled ? [...points, points[0]] : points
+      for (let i = 1; i < route.length; i++)
+        polygons.push([
+          capsule(route[i - 1], route[i], width).map((p) => [p.x, p.y]),
+        ])
+    }
+    if (!polygons.length) return
+    // Tessellate the union, not overlapping triangles: source-over blending
+    // must apply the note's alpha only once even at crossings and filled edges.
+    for (const polygon of polygonClipping.union(
+      polygons[0],
+      ...polygons.slice(1),
+    ))
+      this.polygon(polygon.map((ring) => ring.map(([x, y]) => ({ x, y }))))
+  }
   build(): Mesh {
     return {
       vertices: new Float32Array(this.vertices),
       indices: new Uint32Array(this.indices),
     }
   }
+}
+function capsule(a: Point, b: Point, width: number): Point[] {
+  const angle = Math.atan2(b.y - a.y, b.x - a.x),
+    r = width / 2
+  const points: Point[] = []
+  for (let i = 0; i <= 12; i++) {
+    const t = angle + Math.PI / 2 + (i * Math.PI) / 12
+    points.push({ x: a.x + r * Math.cos(t), y: a.y + r * Math.sin(t) })
+  }
+  for (let i = 0; i <= 12; i++) {
+    const t = angle - Math.PI / 2 + (i * Math.PI) / 12
+    points.push({ x: b.x + r * Math.cos(t), y: b.y + r * Math.sin(t) })
+  }
+  return points
 }
 export function rotate(p: Point, center: Point, degrees = 0): Point {
   const t = (degrees * Math.PI) / 180,

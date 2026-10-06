@@ -264,17 +264,17 @@ export function compileCircuitJson(
             e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean)
           const isFabricationPath = type === "pcb_fabrication_note_path"
           if (isFabricationPath && e.color) mesh.color = parseColor(e.color)
-          if (isFabricationPath && e.is_filled) mesh.polygon([points])
-          if (!isFabricationPath || e.has_stroke !== false) {
+          if (isFabricationPath) {
+            mesh.fabricationPath(
+              points,
+              e.has_stroke === false ? 0 : (e.stroke_width ?? 0.05),
+              !!e.is_filled,
+            )
+          } else {
             mesh.path(
               points,
               e.stroke_width ?? e.width ?? 0.05,
-              type.endsWith("_outline") ||
-                (isFabricationPath &&
-                  !!e.is_filled &&
-                  points.length > 2 &&
-                  (points[0].x !== points.at(-1).x ||
-                    points[0].y !== points.at(-1).y)),
+              type.endsWith("_outline"),
             )
           }
         } else if (type === "pcb_silkscreen_graphic" && e.shape === "brep") {

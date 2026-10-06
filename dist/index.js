@@ -68,6 +68,7 @@ function isValidWireTaperSegment(segment) {
 
 // lib/geometry.ts
 import earcut from "earcut";
+import polygonClipping from "polygon-clipping";
 var MeshBuilder = class {
   constructor(color = [1, 1, 1, 1], element = 0, category = 0) {
     this.color = color;
@@ -103,22 +104,32 @@ var MeshBuilder = class {
   }
   line(a, b, width) {
     if (!(width > 0)) return;
-    const angle = Math.atan2(b.y - a.y, b.x - a.x), r = width / 2;
-    const points = [];
-    for (let i = 0; i <= 12; i++) {
-      const t = angle + Math.PI / 2 + i * Math.PI / 12;
-      points.push({ x: a.x + r * Math.cos(t), y: a.y + r * Math.sin(t) });
-    }
-    for (let i = 0; i <= 12; i++) {
-      const t = angle - Math.PI / 2 + i * Math.PI / 12;
-      points.push({ x: b.x + r * Math.cos(t), y: b.y + r * Math.sin(t) });
-    }
+    const points = capsule(a, b, width);
     this.polygon([points]);
   }
   path(points, width, closed = false) {
     for (let i = 1; i < points.length; i++)
       this.line(points[i - 1], points[i], width);
     if (closed && points.length > 2) this.line(points.at(-1), points[0], width);
+  }
+  fabricationPath(points, width, filled) {
+    if (points.length < 2) return;
+    const polygons = [];
+    if (filled && points.length >= 3)
+      polygons.push([points.map((p) => [p.x, p.y])]);
+    if (width > 0) {
+      const route = filled ? [...points, points[0]] : points;
+      for (let i = 1; i < route.length; i++)
+        polygons.push([
+          capsule(route[i - 1], route[i], width).map((p) => [p.x, p.y])
+        ]);
+    }
+    if (!polygons.length) return;
+    for (const polygon of polygonClipping.union(
+      polygons[0],
+      ...polygons.slice(1)
+    ))
+      this.polygon(polygon.map((ring) => ring.map(([x, y]) => ({ x, y }))));
   }
   build() {
     return {
@@ -127,6 +138,19 @@ var MeshBuilder = class {
     };
   }
 };
+function capsule(a, b, width) {
+  const angle = Math.atan2(b.y - a.y, b.x - a.x), r = width / 2;
+  const points = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = angle + Math.PI / 2 + i * Math.PI / 12;
+    points.push({ x: a.x + r * Math.cos(t), y: a.y + r * Math.sin(t) });
+  }
+  for (let i = 0; i <= 12; i++) {
+    const t = angle - Math.PI / 2 + i * Math.PI / 12;
+    points.push({ x: b.x + r * Math.cos(t), y: b.y + r * Math.sin(t) });
+  }
+  return points;
+}
 function rotate(p, center2, degrees = 0) {
   const t = degrees * Math.PI / 180, x = p.x - center2.x, y = p.y - center2.y;
   return {
@@ -1064,12 +1088,17 @@ function compileCircuitJson(elements, options = {}) {
           const points = e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean);
           const isFabricationPath = type === "pcb_fabrication_note_path";
           if (isFabricationPath && e.color) mesh.color = parseColor(e.color);
-          if (isFabricationPath && e.is_filled) mesh.polygon([points]);
-          if (!isFabricationPath || e.has_stroke !== false) {
+          if (isFabricationPath) {
+            mesh.fabricationPath(
+              points,
+              e.has_stroke === false ? 0 : e.stroke_width ?? 0.05,
+              !!e.is_filled
+            );
+          } else {
             mesh.path(
               points,
               e.stroke_width ?? e.width ?? 0.05,
-              type.endsWith("_outline") || isFabricationPath && !!e.is_filled && points.length > 2 && (points[0].x !== points.at(-1).x || points[0].y !== points.at(-1).y)
+              type.endsWith("_outline")
             );
           }
         } else if (type === "pcb_silkscreen_graphic" && e.shape === "brep") {

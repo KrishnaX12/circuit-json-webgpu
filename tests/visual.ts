@@ -128,6 +128,59 @@ try {
     )
     assert.equal(pixel(fabrication[`${layer}-mirrored`], 40, 40)[3], 0)
   }
+  const overlaps = await page.evaluate(() => {
+    const frames: Record<string, string> = {}
+    for (const layer of ["top", "bottom"] as const) {
+      for (const filled of [false, true]) {
+        window.gpuTest.drawer.drawElements(
+          [
+            {
+              type: "pcb_fabrication_note_path",
+              pcb_fabrication_note_path_id: "overlap",
+              pcb_component_id: "component",
+              layer,
+              route: [
+                { x: 2, y: 2 },
+                { x: 8, y: 2 },
+                { x: 8, y: 8 },
+                { x: 2, y: 2 },
+                { x: 8, y: 8 },
+              ],
+              stroke_width: 1,
+              color: "rgba(255,0,0,0.5)",
+              is_filled: filled,
+            },
+          ],
+          {
+            transform: { a: 10, b: 0, c: 0, d: 10, e: 0, f: 0 },
+            selectedLayer: layer,
+            showFabricationNotes: true,
+            background: [0, 0, 0, 0],
+          },
+        )
+        frames[`${layer}-${filled}`] = document
+          .querySelector("canvas")!
+          .toDataURL("image/png")
+          .split(",")[1]
+      }
+    }
+    return frames
+  })
+  for (const frame of Object.values(overlaps)) {
+    for (const [x, y] of [
+      [50, 20],
+      [80, 20],
+      [50, 50],
+      [20, 20],
+    ]) {
+      const rgba = pixel(frame, x, y)
+      assert.equal(rgba[0], 255)
+      assert(
+        Math.abs(rgba[3] - 128) <= 1,
+        "Fabrication overlap must apply alpha once",
+      )
+    }
+  }
   const pours = await page.evaluate(() =>
     window.gpuTest.checkCopperPourOpacity(),
   )

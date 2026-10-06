@@ -518,7 +518,8 @@ test("fabrication paths retain optional strokes, close filled outlines, and igno
   const legacy = compile()
   expect(compile({ is_filled: false, has_stroke: true })).toEqual(legacy)
   const filled = compile({ is_filled: true })
-  expect(area(filled)).toBeGreaterThan(area(legacy) + 48)
+  expect(area(filled)).toBeGreaterThan(48)
+  expect(area(filled)).toBeLessThan(area(legacy) + 48)
   expect(area(compile({ is_filled: true, stroke_width: 0 }))).toBeCloseTo(48)
   expect(compile({ has_stroke: false }).indices.length).toBe(0)
   for (const route of [[], [{ x: 0, y: 0 }]]) {
@@ -527,4 +528,45 @@ test("fabrication paths retain optional strokes, close filled outlines, and igno
     expect(scene.diagnostics).toEqual([])
     expect(scene.triangleCount).toBe(0)
   }
+})
+
+test("fabrication path tessellation unions retraced segments instead of stacking triangles", () => {
+  const single = new MeshBuilder()
+  single.fabricationPath(
+    [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ],
+    2,
+    false,
+  )
+  const retraced = new MeshBuilder()
+  retraced.fabricationPath(
+    [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+    ],
+    2,
+    false,
+  )
+  expect(area(retraced.build())).toBeCloseTo(area(single.build()), 5)
+  const closed = new MeshBuilder()
+  closed.fabricationPath(
+    [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ],
+    2,
+    false,
+  )
+  // A square stroked with round outer corners retains its unpainted center.
+  expect(area(closed.build())).toBeCloseTo(
+    80 - 4 + 12 * Math.sin(Math.PI / 12),
+    4,
+  )
 })
