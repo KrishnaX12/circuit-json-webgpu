@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "lib/*": [
+        "./lib/*"
+      ],
+      "tests/*": [
+        "./tests/*"
+      ],
+      "circuit-json": [
+        "./node_modules/circuit-json-reference/dist/index.d.mts"
+      ]
+    }
+  },
+  "include": [
+    "tests/upstream/**/*.ts",
+    "tests/parity/capture.ts"
+  ],
+  "exclude": []
+}

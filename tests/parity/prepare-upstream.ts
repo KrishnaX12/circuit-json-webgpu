@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync } from "node:fs"
+import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 import { createRequire } from "node:module"
@@ -18,3 +18,13 @@ for (const path of Object.keys(manifest.files)) {
   mkdirSync(dirname(dest), { recursive: true })
   cpSync(resolve(installed, path), dest)
 }
+
+// The byte-for-byte pinned Canvas reference uses the schema it was authored
+// against. Keep its types separate from the renderer's current Circuit JSON.
+const referenceSchema = dirname(
+  require.resolve("circuit-json-reference/package.json"),
+)
+const schemaLink = resolve(target, "node_modules/circuit-json")
+mkdirSync(dirname(schemaLink), { recursive: true })
+rmSync(schemaLink, { recursive: true, force: true })
+symlinkSync(referenceSchema, schemaLink, "dir")
