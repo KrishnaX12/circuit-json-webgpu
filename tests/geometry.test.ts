@@ -457,3 +457,74 @@ test("rounded rectangular pads stay rectangular while their slots rotate indepen
   for (const [i, expected] of [-1, 1, -2, 2].entries())
     expect(meshBounds(layer.erase)[i]).toBeCloseTo(expected, 2)
 })
+
+const fabricationPath = {
+  type: "pcb_fabrication_note_path" as const,
+  pcb_fabrication_note_path_id: "solid-region",
+  pcb_component_id: "component",
+  layer: "top" as const,
+  route: [
+    { x: 0, y: 0 },
+    { x: 8, y: 0 },
+    { x: 8, y: 4 },
+    { x: 4, y: 4 },
+    { x: 4, y: 8 },
+    { x: 0, y: 8 },
+  ],
+  stroke_width: 2,
+}
+
+test("fabrication path fills triangulate concave regions without widening them", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    for (const route of [
+      fabricationPath.route,
+      [...fabricationPath.route, fabricationPath.route[0]],
+    ]) {
+      const path = {
+        ...fabricationPath,
+        layer,
+        route,
+        is_filled: true,
+        has_stroke: false,
+        color: "rgba(255,0,0,0.5)",
+      }
+      const scene = compileCircuitJson([path])
+      expect(scene.diagnostics).toEqual([])
+      const mesh = scene.layers.find(
+        (l) => l.name === `${layer}_fabrication`,
+      )!.paint
+      expect(area(mesh)).toBeCloseTo(48)
+      expect(meshBounds(mesh)).toEqual([0, 8, 0, 8])
+      expect([...mesh.vertices.slice(2, 6)]).toEqual([1, 0, 0, 0.5])
+      for (let i = 0; i < mesh.indices.length; i += 3) {
+        const triangle = [...mesh.indices.slice(i, i + 3)]
+        const x = triangle.reduce((sum, j) => sum + mesh.vertices[j * 8], 0) / 3
+        const y =
+          triangle.reduce((sum, j) => sum + mesh.vertices[j * 8 + 1], 0) / 3
+        expect(x > 4 && y > 4).toBe(false)
+      }
+    }
+  }
+})
+
+test("fabrication paths retain optional strokes, close filled outlines, and ignore disabled geometry", () => {
+  const compile = (
+    flags: {
+      is_filled?: boolean
+      has_stroke?: boolean
+      stroke_width?: number
+    } = {},
+  ) => compileCircuitJson([{ ...fabricationPath, ...flags }]).layers[0].paint
+  const legacy = compile()
+  expect(compile({ is_filled: false, has_stroke: true })).toEqual(legacy)
+  const filled = compile({ is_filled: true })
+  expect(area(filled)).toBeGreaterThan(area(legacy) + 48)
+  expect(area(compile({ is_filled: true, stroke_width: 0 }))).toBeCloseTo(48)
+  expect(compile({ has_stroke: false }).indices.length).toBe(0)
+  for (const route of [[], [{ x: 0, y: 0 }]]) {
+    const path = { ...fabricationPath, route, is_filled: true }
+    const scene = compileCircuitJson([path])
+    expect(scene.diagnostics).toEqual([])
+    expect(scene.triangleCount).toBe(0)
+  }
+})

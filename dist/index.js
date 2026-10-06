@@ -331,7 +331,7 @@ function fillEvenOdd(mesh, rings) {
     }
 }
 
-// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetLayout.ts
+// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetLayout.ts
 import {
   glyphAdvanceRatio,
   kerningRatio,
@@ -376,7 +376,7 @@ function getAlphabetLayout(text, fontSize) {
   };
 }
 
-// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetOutlineGroups.ts
+// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getAlphabetOutlineGroups.ts
 import glyphOutlineAlphabet from "@tscircuit/alphabet/outline-polygons";
 function getAlphabetOutlineGroups(params) {
   const { line, fontSize, startX, startY } = params;
@@ -403,7 +403,7 @@ function getAlphabetOutlineGroups(params) {
   return groups;
 }
 
-// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getPolygonBounds.ts
+// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getPolygonBounds.ts
 function getPolygonBounds(polygons) {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -423,7 +423,7 @@ function getPolygonBounds(polygons) {
   return { minX, minY, maxX, maxY };
 }
 
-// ../circuit-json-webgpu/node_modules/circuit-to-canvas/lib/drawer/shapes/text/getTextStartPosition.ts
+// node_modules/circuit-to-canvas/lib/drawer/shapes/text/getTextStartPosition.ts
 function getTextGeometry(alignment, layout, fontSize) {
   const baseLinePlacements = getBaseLinePlacements(alignment, layout);
   const baseGlyphGroups = getGlyphGroupsForLinePlacements(
@@ -604,7 +604,7 @@ function drawText(mesh, e, yAxis = "up") {
     );
 }
 
-// ../circuit-json-webgpu/node_modules/@tscircuit/math-utils/dist/chunk-5J3PCV4D.js
+// node_modules/@tscircuit/math-utils/dist/chunk-5J3PCV4D.js
 function midpoint(p1, p2) {
   return {
     x: (p1.x + p2.x) / 2,
@@ -612,7 +612,7 @@ function midpoint(p1, p2) {
   };
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/applyToPoint.js
+// node_modules/transformation-matrix/src/applyToPoint.js
 function applyToPoint(matrix, point) {
   return Array.isArray(point) ? [
     matrix.a * point[0] + matrix.c * point[1] + matrix.e,
@@ -623,12 +623,12 @@ function applyToPoint(matrix, point) {
   };
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/utils.js
+// node_modules/transformation-matrix/src/utils.js
 function isUndefined(val) {
   return typeof val === "undefined";
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/translate.js
+// node_modules/transformation-matrix/src/translate.js
 function translate(tx, ty = 0) {
   return {
     a: 1,
@@ -640,7 +640,7 @@ function translate(tx, ty = 0) {
   };
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/transform.js
+// node_modules/transformation-matrix/src/transform.js
 function transform(...matrices) {
   matrices = Array.isArray(matrices[0]) ? matrices[0] : matrices;
   const multiply = (m1, m2) => {
@@ -668,7 +668,7 @@ function transform(...matrices) {
   }
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/rotate.js
+// node_modules/transformation-matrix/src/rotate.js
 var { cos, sin, PI } = Math;
 function rotate2(angle, cx, cy) {
   const cosAngle = cos(angle);
@@ -694,7 +694,7 @@ function rotateDEG(angle, cx = void 0, cy = void 0) {
   return rotate2(angle * PI / 180, cx, cy);
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/scale.js
+// node_modules/transformation-matrix/src/scale.js
 function scale(sx, sy = void 0, cx = void 0, cy = void 0) {
   if (isUndefined(sy)) sy = sx;
   const scaleMatrix = {
@@ -715,7 +715,7 @@ function scale(sx, sy = void 0, cx = void 0, cy = void 0) {
   ]);
 }
 
-// ../circuit-json-webgpu/node_modules/transformation-matrix/src/skew.js
+// node_modules/transformation-matrix/src/skew.js
 var { tan } = Math;
 
 // lib/pcb-dimension/get-pcb-dimension-geometry.ts
@@ -1062,11 +1062,16 @@ function compileCircuitJson(elements, options = {}) {
           drawText(mesh, e, options.textYAxis);
         } else if (type.endsWith("_path") || type.endsWith("_line") || type.endsWith("_outline")) {
           const points = e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean);
-          mesh.path(
-            points,
-            e.stroke_width ?? e.width ?? 0.05,
-            type.endsWith("_outline")
-          );
+          const isFabricationPath = type === "pcb_fabrication_note_path";
+          if (isFabricationPath && e.color) mesh.color = parseColor(e.color);
+          if (isFabricationPath && e.is_filled) mesh.polygon([points]);
+          if (!isFabricationPath || e.has_stroke !== false) {
+            mesh.path(
+              points,
+              e.stroke_width ?? e.width ?? 0.05,
+              type.endsWith("_outline") || isFabricationPath && !!e.is_filled && points.length > 2 && (points[0].x !== points.at(-1).x || points[0].y !== points.at(-1).y)
+            );
+          }
         } else if (type === "pcb_silkscreen_graphic" && e.shape === "brep") {
           mesh.polygon(shape(e));
         } else if (type.endsWith("_rect")) {

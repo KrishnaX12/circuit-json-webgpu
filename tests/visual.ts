@@ -68,6 +68,66 @@ try {
       ),
     ]
   }
+  const fabrication = await page.evaluate(() => {
+    const drawer = window.gpuTest.drawer
+    const canvas = document.querySelector("canvas")!
+    const frames: Record<string, string> = {}
+    for (const layer of ["top", "bottom"] as const) {
+      const path = {
+        type: "pcb_fabrication_note_path" as const,
+        pcb_fabrication_note_path_id: "filled-region",
+        pcb_component_id: "component",
+        layer,
+        route: [
+          { x: 0, y: 0 },
+          { x: 8, y: 0 },
+          { x: 8, y: 4 },
+          { x: 4, y: 4 },
+          { x: 4, y: 8 },
+          { x: 0, y: 8 },
+        ],
+        stroke_width: 2,
+        is_filled: true,
+        has_stroke: false,
+        color: "rgba(255,0,0,0.5)",
+      }
+      drawer.drawElements([path], {
+        transform: { a: 10, b: 0, c: 0, d: -10, e: 20, f: 100 },
+        selectedLayer: layer,
+        showFabricationNotes: true,
+        background: [0, 0, 0, 0],
+      })
+      frames[layer] = canvas.toDataURL("image/png").split(",")[1]
+      drawer.render({ showFabricationNotes: false })
+      frames[`${layer}-hidden`] = canvas.toDataURL("image/png").split(",")[1]
+      drawer.render({
+        showFabricationNotes: true,
+        transform: { a: -10, b: 0, c: 0, d: -10, e: 100, f: 100 },
+      })
+      frames[`${layer}-mirrored`] = canvas.toDataURL("image/png").split(",")[1]
+    }
+    return frames
+  })
+  for (const layer of ["top", "bottom"]) {
+    const inside = pixel(fabrication[layer], 40, 80)
+    assert.equal(inside[0], 255)
+    assert(Math.abs(inside[3] - 128) <= 1, "Fabrication fill preserves alpha")
+    assert.equal(
+      pixel(fabrication[layer], 80, 40)[3],
+      0,
+      "Concave notch stays empty",
+    )
+    assert.equal(
+      pixel(fabrication[layer], 15, 80)[3],
+      0,
+      "Fill has no invented outline",
+    )
+    assert.equal(pixel(fabrication[`${layer}-hidden`], 40, 80)[3], 0)
+    assert(
+      Math.abs(pixel(fabrication[`${layer}-mirrored`], 80, 80)[3] - 128) <= 1,
+    )
+    assert.equal(pixel(fabrication[`${layer}-mirrored`], 40, 40)[3], 0)
+  }
   const pours = await page.evaluate(() =>
     window.gpuTest.checkCopperPourOpacity(),
   )
