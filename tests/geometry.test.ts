@@ -23,6 +23,123 @@ function area(mesh: ReturnType<MeshBuilder["build"]>) {
   }
   return area
 }
+
+test("rectangular soldermask openings erase only the selected mask layer", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_board",
+      pcb_board_id: "board",
+      center: { x: 0, y: 0 },
+      width: 10,
+      height: 10,
+      thickness: 1.6,
+      num_layers: 2,
+      material: "fr4",
+    },
+    {
+      type: "pcb_copper_pour",
+      pcb_copper_pour_id: "pour",
+      covered_with_solder_mask: true,
+      shape: "rect",
+      layer: "top",
+      center: { x: 0, y: 0 },
+      width: 8,
+      height: 8,
+    },
+    {
+      type: "pcb_soldermask_opening",
+      pcb_soldermask_opening_id: "opening",
+      shape: "rect",
+      layer: "top",
+      x: 0,
+      y: 0,
+      width: 4,
+      height: 2,
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  const mask = scene.layers.find((layer) => layer.name === "soldermask_top")!
+  expect(area(mask.paint)).toBeCloseTo(100)
+  expect(area(mask.erase)).toBeCloseTo(8)
+  expect(
+    scene.layers
+      .filter((layer) => layer.erase.indices.length > 0)
+      .map((layer) => layer.name),
+  ).toEqual(["soldermask_top"])
+  expect(
+    area(scene.layers.find((layer) => layer.name === "top")!.paint),
+  ).toBeCloseTo(64)
+  expect(
+    area(scene.layers.find((layer) => layer.name === "board")!.paint),
+  ).toBeCloseTo(100)
+  expect(scene.layers.some((layer) => layer.name === "drill")).toBe(false)
+})
+
+test("circular soldermask openings work without a board or copper", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_soldermask_opening",
+      pcb_soldermask_opening_id: "opening",
+      shape: "circle",
+      layer: "bottom",
+      x: 3,
+      y: -2,
+      radius: 1,
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.layers.map((layer) => layer.name)).toEqual(["soldermask_bottom"])
+  expect(scene.layers[0].paint.indices.length).toBe(0)
+  expect(area(scene.layers[0].erase)).toBeCloseTo(Math.PI, 1)
+})
+
+test("rotated rectangular soldermask openings preserve position and rotation", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_soldermask_opening",
+      pcb_soldermask_opening_id: "opening",
+      shape: "rotated_rect",
+      layer: "bottom",
+      x: 3,
+      y: -2,
+      width: 4,
+      height: 2,
+      ccw_rotation: 90,
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.layers.map((layer) => layer.name)).toEqual(["soldermask_bottom"])
+  const mesh = scene.layers[0].erase
+  expect(area(mesh)).toBeCloseTo(8)
+  const xs = [...mesh.vertices].filter((_, index) => index % 8 === 0)
+  const ys = [...mesh.vertices].filter((_, index) => index % 8 === 1)
+  expect([Math.min(...xs), Math.max(...xs)]).toEqual([2, 4])
+  expect(Math.min(...ys)).toBeCloseTo(-4)
+  expect(Math.max(...ys)).toBeCloseTo(0)
+})
+
+test("polygon soldermask openings preserve concave boundaries", () => {
+  const scene = compileCircuitJson([
+    {
+      type: "pcb_soldermask_opening",
+      pcb_soldermask_opening_id: "opening",
+      shape: "polygon",
+      layer: "top",
+      points: [
+        { x: 0, y: 0 },
+        { x: 3, y: 0 },
+        { x: 3, y: 1 },
+        { x: 1, y: 1 },
+        { x: 1, y: 3 },
+        { x: 0, y: 3 },
+      ],
+    },
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(scene.layers.map((layer) => layer.name)).toEqual(["soldermask_top"])
+  expect(scene.layers[0].paint.indices.length).toBe(0)
+  expect(area(scene.layers[0].erase)).toBeCloseTo(5)
+})
 // Repro: <board width="10mm" height="10mm">
 //   <cutout shape="rect" width="6mm" height="4mm" />
 // </board>
