@@ -367,6 +367,66 @@ try {
     console.log(`snapshot ${name}`)
     return PNG.sync.read(buffer)
   }
+  const soldermask = await page.evaluate(async () => {
+    const drawer = window.gpuTest.drawer
+    drawer.drawElements(
+      [
+        {
+          type: "pcb_board",
+          pcb_board_id: "board",
+          center: { x: 0, y: 0 },
+          width: 10,
+          height: 6,
+          thickness: 1.6,
+          num_layers: 2,
+          material: "fr4",
+        },
+        {
+          type: "pcb_copper_pour",
+          pcb_copper_pour_id: "pour",
+          shape: "rect",
+          layer: "top",
+          center: { x: 0, y: 0 },
+          width: 8,
+          height: 4,
+          covered_with_solder_mask: true,
+        },
+        {
+          type: "pcb_soldermask_opening",
+          pcb_soldermask_opening_id: "opening",
+          shape: "rect",
+          layer: "top",
+          x: 0,
+          y: 0,
+          width: 4,
+          height: 2,
+        },
+      ],
+      {
+        transform: { a: 60, b: 0, c: 0, d: -60, e: 400, f: 300 },
+        selectedLayer: "top",
+        showSolderMask: true,
+        showCopperPours: true,
+        copperPourOpacity: 1,
+        xRayElementIds: [],
+        highlightedElementIds: [],
+        background: [0, 0, 0, 1],
+      },
+    )
+    await drawer.flush()
+    return {
+      diagnostics: drawer.diagnostics,
+      png: document
+        .querySelector("canvas")!
+        .toDataURL("image/png")
+        .split(",")[1],
+    }
+  })
+  assert.deepEqual(soldermask.diagnostics, [])
+  await snapshot("soldermask-opening")
+  // Only the opening exposes copper; the surrounding soldermask stays intact.
+  assert.deepEqual(pixel(soldermask.png, 400, 300), layerColors.top)
+  assert.deepEqual(pixel(soldermask.png, 580, 300), [12, 55, 33, 255])
   for (const name of names) {
     const stats = await page.evaluate(
       (name) => window.gpuTest.renderFixture(name),
@@ -514,7 +574,7 @@ try {
     errors.filter((e) => !e.includes("404")),
     [],
   )
-  const report = { snapshots: names.length + 1, adapter, large, navigation }
+  const report = { snapshots: names.length + 2, adapter, large, navigation }
   await writeFile(
     new URL("./actual/report.json", import.meta.url),
     JSON.stringify(report, null, 2),

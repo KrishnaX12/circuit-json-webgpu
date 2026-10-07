@@ -1014,6 +1014,8 @@ function compileCircuitJson(elements, options = {}) {
       } else if (type === "pcb_cutout") {
         cutouts.push({ rings: shape(e), index });
         get("edge_cuts", index).path(shape(e)[0], 0.05, true);
+      } else if (input.type === "pcb_soldermask_opening") {
+        get(`soldermask_${input.layer}`, index, true).polygon(shape(input));
       } else if (type === "pcb_smtpad") {
         get(e.layer, index).polygon(shape(e));
         if (!e.is_covered_with_solder_mask)
