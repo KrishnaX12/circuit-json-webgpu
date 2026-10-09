@@ -687,3 +687,42 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     4,
   )
 })
+
+test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    for (const ccw_rotation of [0, 45, 90]) {
+      const scene = compileCircuitJson([
+        {
+          type: "pcb_silkscreen_oval",
+          pcb_silkscreen_oval_id: "oval",
+          pcb_component_id: "component",
+          layer,
+          center: { x: 3, y: -2 },
+          radius_x: 2,
+          radius_y: 1,
+          ccw_rotation,
+        },
+      ])
+      expect(scene.diagnostics).toEqual([])
+      expect(scene.layers.map((mesh) => mesh.name)).toEqual([
+        `${layer}_silkscreen`,
+      ])
+      const mesh = scene.layers[0].paint
+      expect(mesh.indices.length).toBeGreaterThan(0)
+      const radians = (ccw_rotation * Math.PI) / 180
+      const xs: number[] = [],
+        ys: number[] = []
+      for (let i = 0; i < mesh.vertices.length; i += 8) {
+        const x = mesh.vertices[i] - 3,
+          y = mesh.vertices[i + 1] + 2
+        xs.push(x * Math.cos(radians) + y * Math.sin(radians))
+        ys.push(-x * Math.sin(radians) + y * Math.cos(radians))
+      }
+      expect(Math.max(...xs)).toBeCloseTo(2.05, 2)
+      expect(Math.min(...xs)).toBeCloseTo(-2.05, 2)
+      expect(Math.max(...ys)).toBeCloseTo(1.05, 2)
+      expect(Math.min(...ys)).toBeCloseTo(-1.05, 2)
+      expect(scene.layers[0].erase.indices.length).toBe(0)
+    }
+  }
+})

@@ -291,6 +291,15 @@ export function compileCircuitJson(
           )
           if (e.is_filled) mesh.polygon([points])
           else mesh.path(points, e.stroke_width ?? 0.05, true)
+        } else if (input.type === "pcb_silkscreen_oval") {
+          const points = ellipse(
+            input.center,
+            input.radius_x * 2,
+            input.radius_y * 2,
+            input.ccw_rotation ?? 0,
+          )
+          // Match the fixed oval stroke used by the Canvas and SVG renderers.
+          mesh.path(points, 0.1, true)
         } else if (type.endsWith("_circle")) {
           const points = ellipse(center(e), (e.radius ?? 0) * 2)
           if (e.is_filled) mesh.polygon([points])
