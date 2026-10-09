@@ -1115,6 +1115,15 @@ function compileCircuitJson(elements, options = {}) {
           );
           if (e.is_filled) mesh.polygon([points]);
           else mesh.path(points, e.stroke_width ?? 0.05, true);
+        } else if (input.type === "pcb_silkscreen_pill") {
+          const points = rectangle(
+            input.center,
+            input.width,
+            input.height,
+            Math.min(input.width, input.height) / 2,
+            input.ccw_rotation ?? 0
+          );
+          mesh.path(points, 0.2, true);
         } else if (type.endsWith("_circle")) {
           const points = ellipse(center(e), (e.radius ?? 0) * 2);
           if (e.is_filled) mesh.polygon([points]);

@@ -68,6 +68,57 @@ try {
       ),
     ]
   }
+  const pills = await page.evaluate(() => {
+    const drawer = window.gpuTest.drawer
+    const canvas = document.querySelector("canvas")!
+    const frames: Record<string, string> = {}
+    for (const layer of ["top", "bottom"] as const) {
+      for (const ccw_rotation of [0, 90]) {
+        drawer.drawElements(
+          [
+            {
+              type: "pcb_silkscreen_pill",
+              pcb_silkscreen_pill_id: "pill",
+              pcb_component_id: "component",
+              layer,
+              center: { x: 0, y: 0 },
+              width: 6,
+              height: 2,
+              ccw_rotation,
+            },
+          ],
+          {
+            transform: { a: 20, b: 0, c: 0, d: -20, e: 100, f: 100 },
+            selectedLayer: layer,
+            background: [0, 0, 0, 0],
+          },
+        )
+        frames[`${layer}-${ccw_rotation}`] = canvas
+          .toDataURL("image/png")
+          .split(",")[1]
+      }
+    }
+    return frames
+  })
+  for (const layer of ["top", "bottom"]) {
+    for (const ccw_rotation of [0, 90]) {
+      const frame = pills[`${layer}-${ccw_rotation}`]
+      assert(
+        pixel(frame, ccw_rotation ? 120 : 100, ccw_rotation ? 100 : 80)[3] > 0,
+        "Pill outline must be visible after rotation",
+      )
+      assert.equal(
+        pixel(frame, 100, 100)[3],
+        0,
+        "Pill center must remain unfilled",
+      )
+      assert.equal(
+        pixel(frame, 180, 100)[3],
+        0,
+        "Outside the pill must remain empty",
+      )
+    }
+  }
   const fabrication = await page.evaluate(() => {
     const drawer = window.gpuTest.drawer
     const canvas = document.querySelector("canvas")!

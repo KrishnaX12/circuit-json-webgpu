@@ -1,0 +1,14 @@
+[
+  {
+    "type": "pcb_silkscreen_pill",
+    "pcb_silkscreen_pill_id": "pill",
+    "pcb_component_id": "component",
+    "layer": "top",
+    "center": {
+      "x": 0,
+      "y": 0
+    },
+    "width": 6,
+    "height": 2
+  }
+]

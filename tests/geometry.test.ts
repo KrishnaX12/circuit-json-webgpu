@@ -687,3 +687,47 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     4,
   )
 })
+
+test("silkscreen pills preserve dimensions, rotation, and layer without filling", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    for (const [width, height] of [
+      [6, 2],
+      [2, 6],
+      [2, 2],
+    ]) {
+      for (const ccw_rotation of [0, 45, 90]) {
+        const scene = compileCircuitJson([
+          {
+            type: "pcb_silkscreen_pill",
+            pcb_silkscreen_pill_id: "pill",
+            pcb_component_id: "component",
+            layer,
+            center: { x: 3, y: -2 },
+            width,
+            height,
+            ccw_rotation,
+          },
+        ])
+        expect(scene.diagnostics).toEqual([])
+        expect(scene.layers.map((mesh) => mesh.name)).toEqual([
+          `${layer}_silkscreen`,
+        ])
+        const mesh = scene.layers[0].paint
+        expect(mesh.indices.length).toBeGreaterThan(0)
+        const radians = (ccw_rotation * Math.PI) / 180
+        const xs: number[] = [],
+          ys: number[] = []
+        for (let i = 0; i < mesh.vertices.length; i += 8) {
+          const x = mesh.vertices[i] - 3,
+            y = mesh.vertices[i + 1] + 2
+          xs.push(x * Math.cos(radians) + y * Math.sin(radians))
+          ys.push(-x * Math.sin(radians) + y * Math.cos(radians))
+        }
+        expect(Math.min(...xs)).toBeCloseTo(-width / 2 - 0.1, 2)
+        expect(Math.max(...xs)).toBeCloseTo(width / 2 + 0.1, 2)
+        expect(Math.min(...ys)).toBeCloseTo(-height / 2 - 0.1, 2)
+        expect(Math.max(...ys)).toBeCloseTo(height / 2 + 0.1, 2)
+      }
+    }
+  }
+})
