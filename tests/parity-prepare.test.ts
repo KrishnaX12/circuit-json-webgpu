@@ -56,3 +56,37 @@ test("Canvas-only passes are not mislabeled as SVG comparisons", () => {
   ])
     expect(prepareComparison({ ...fixture, ...extra }).reason).toBeTruthy()
 })
+
+test("polygon-hole comparisons apply schema defaults without losing explicit offsets", () => {
+  const hole = {
+    type: "pcb_plated_hole",
+    pcb_plated_hole_id: "polygon-hole",
+    shape: "hole_with_polygon_pad",
+    x: 50,
+    y: 25,
+    hole_shape: "circle",
+    hole_diameter: 2,
+    pad_outline: [
+      { x: -3, y: -3 },
+      { x: 3, y: -3 },
+      { x: 0, y: 3 },
+    ],
+    layers: ["top", "bottom"],
+  }
+  const { scene } = prepareComparison({ ...fixture, elements: [hole] })
+  assert(scene)
+  expect(scene.elements[0]).toMatchObject({
+    hole_offset_x: 0,
+    hole_offset_y: 0,
+  })
+  expect(hole).not.toHaveProperty("hole_offset_x")
+  const offset = prepareComparison({
+    ...fixture,
+    elements: [{ ...hole, hole_offset_x: 5, hole_offset_y: -3 }],
+  })
+  assert(offset.scene)
+  expect(offset.scene.elements[0]).toMatchObject({
+    hole_offset_x: 5,
+    hole_offset_y: -3,
+  })
+})

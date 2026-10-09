@@ -1,5 +1,5 @@
 import type { CapturedCase } from "./types"
-import type { LayerRef } from "circuit-json"
+import { pcb_plated_hole, type LayerRef } from "circuit-json"
 import { compose, inverse, applyToPoint } from "transformation-matrix"
 import { getElementRenderLayers } from "@tscircuit/circuit-json-util"
 
@@ -55,6 +55,17 @@ export function prepareComparison(
         return !layers.length || layers.some((l) => requested.includes(l))
       })
     : c.elements
+  // The captured Canvas fixtures may omit offsets whose Circuit JSON default is zero.
+  // Apply the schema once so SVG and WebGPU receive identical, valid elements.
+  const sceneElements = elements.some(
+    (e) => e.type === "pcb_plated_hole" && e.shape === "hole_with_polygon_pad",
+  )
+    ? elements.map((e) =>
+        e.type === "pcb_plated_hole" && e.shape === "hole_with_polygon_pad"
+          ? pcb_plated_hole.parse(e)
+          : e,
+      )
+    : elements
   const m = compose(c.contextTransform, c.matrix)
   const inv = inverse(m)
   const corners = [
@@ -98,7 +109,7 @@ export function prepareComparison(
   if (layers) layers.push("board", "edge_cuts", "drill")
   return {
     scene: {
-      elements,
+      elements: sceneElements,
       width: c.width,
       height: c.height,
       viewport,
