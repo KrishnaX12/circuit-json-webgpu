@@ -17,7 +17,7 @@ export async function featureSnapshot(
   })
   const header = PNG.sync.read(
     new Resvg(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${pair.width}" height="${headerHeight}"><rect width="100%" height="100%" fill="#222"/><g fill="white" font-family="sans-serif" font-size="14"><text x="8" y="22">SVG</text><text x="${svg.width + 8}" y="22">WebGPU</text></g></svg>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${pair.width}" height="${headerHeight}"><rect width="100%" height="100%" fill="#222"/><g fill="white" font-family="sans-serif" font-size="14"><text x="8" y="22">circuit-to-svg</text><text x="${svg.width + 8}" y="22">circuit-json-webgpu</text></g></svg>`,
     )
       .render()
       .asPng(),
