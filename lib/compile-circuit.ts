@@ -51,10 +51,21 @@ function shape(e: Element, hole = false): Point[][] {
       ),
     ]
   }
+  if (e.shape === "hole_with_polygon_pad" && !hole)
+    return [
+      e.pad_outline.map((point: Point) => ({
+        x: e.x + point.x,
+        y: e.y + point.y,
+      })),
+    ]
   const kind = hole ? (e.hole_shape ?? e.shape) : e.shape
   if (kind === "polygon") return [e.points ?? e.vertices ?? []]
   const base = center(e),
-    rotation = e.rect_ccw_rotation ?? e.ccw_rotation ?? e.rotation ?? 0
+    // Polygon-pad drill offsets use board coordinates in the reference renderers.
+    rotation =
+      e.shape === "hole_with_polygon_pad"
+        ? 0
+        : (e.rect_ccw_rotation ?? e.ccw_rotation ?? e.rotation ?? 0)
   const c = hole
     ? rotate(
         {

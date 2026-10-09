@@ -68,6 +68,61 @@ try {
       ),
     ]
   }
+  const polygonPads = await page.evaluate(() => {
+    const drawer = window.gpuTest.drawer
+    const canvas = document.querySelector("canvas")!
+    const frames: Record<string, string> = {}
+    for (const layer of ["top", "bottom"] as const) {
+      drawer.drawElements(
+        [
+          {
+            type: "pcb_plated_hole",
+            pcb_plated_hole_id: "polygon-pad",
+            shape: "hole_with_polygon_pad",
+            x: 0,
+            y: 0,
+            pad_outline: [
+              { x: -4, y: -3 },
+              { x: 4, y: -3 },
+              { x: 4, y: 3 },
+              { x: -4, y: 3 },
+            ],
+            layers: ["top", "bottom"],
+            hole_shape: "pill",
+            hole_width: 3,
+            hole_height: 2,
+            hole_offset_x: 1,
+            hole_offset_y: -1,
+          },
+        ],
+        {
+          transform: { a: 20, b: 0, c: 0, d: -20, e: 100, f: 100 },
+          selectedLayer: layer,
+          showSolderMask: false,
+          background: [0, 0, 0, 0],
+        },
+      )
+      frames[layer] = canvas.toDataURL("image/png").split(",")[1]
+    }
+    return frames
+  })
+  for (const layer of ["top", "bottom"] as const) {
+    assert.deepEqual(
+      pixel(polygonPads[layer], 60, 80),
+      layer === "top" ? [200, 52, 52, 255] : [77, 127, 196, 255],
+      "Polygon copper must be visible on the selected layer",
+    )
+    assert.deepEqual(
+      pixel(polygonPads[layer], 120, 120),
+      [255, 38, 226, 255],
+      "Offset drill must clear copper and retain drill color",
+    )
+    assert.equal(
+      pixel(polygonPads[layer], 100, 20)[3],
+      0,
+      "Outside the polygon must remain empty",
+    )
+  }
   const fabrication = await page.evaluate(() => {
     const drawer = window.gpuTest.drawer
     const canvas = document.querySelector("canvas")!

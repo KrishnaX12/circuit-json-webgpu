@@ -939,9 +939,16 @@ function shape(e, hole = false) {
       )
     ];
   }
+  if (e.shape === "hole_with_polygon_pad" && !hole)
+    return [
+      e.pad_outline.map((point) => ({
+        x: e.x + point.x,
+        y: e.y + point.y
+      }))
+    ];
   const kind = hole ? e.hole_shape ?? e.shape : e.shape;
   if (kind === "polygon") return [e.points ?? e.vertices ?? []];
-  const base = center(e), rotation = e.rect_ccw_rotation ?? e.ccw_rotation ?? e.rotation ?? 0;
+  const base = center(e), rotation = e.shape === "hole_with_polygon_pad" ? 0 : e.rect_ccw_rotation ?? e.ccw_rotation ?? e.rotation ?? 0;
   const c = hole ? rotate(
     {
       x: base.x + (e.hole_offset_x ?? 0),

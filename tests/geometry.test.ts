@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { pcb_plated_hole } from "circuit-json"
 import { compileCircuitJson } from "../lib"
 import { drawKeepout } from "../lib/draw-keepout"
 import {
@@ -686,4 +687,96 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     80 - 4 + 12 * Math.sin(Math.PI / 12),
     4,
   )
+})
+
+test("polygon plated-hole pads translate their outlines and offset each drill shape", () => {
+  for (const hole_shape of [
+    "circle",
+    "oval",
+    "pill",
+    "rotated_pill",
+  ] as const) {
+    const scene = compileCircuitJson([
+      {
+        type: "pcb_plated_hole",
+        pcb_plated_hole_id: "polygon-hole",
+        shape: "hole_with_polygon_pad",
+        x: 10,
+        y: 20,
+        pad_outline: [
+          { x: -5, y: -4 },
+          { x: 5, y: -4 },
+          { x: 5, y: 4 },
+          { x: -5, y: 4 },
+        ],
+        layers: ["top", "bottom"],
+        hole_shape,
+        hole_diameter: 2,
+        hole_width: 4,
+        hole_height: 2,
+        hole_offset_x: 1,
+        hole_offset_y: -1,
+      },
+    ])
+    expect(scene.diagnostics).toEqual([])
+    for (const layer of ["top", "bottom"]) {
+      const copper = scene.layers.find((mesh) => mesh.name === layer)!
+      expect(area(copper.paint)).toBeCloseTo(80)
+      const xs = [...copper.paint.vertices].filter((_, i) => i % 8 === 0)
+      const ys = [...copper.paint.vertices].filter((_, i) => i % 8 === 1)
+      expect(Math.min(...xs)).toBe(5)
+      expect(Math.max(...xs)).toBe(15)
+      expect(Math.min(...ys)).toBe(16)
+      expect(Math.max(...ys)).toBe(24)
+      expect(copper.erase.indices.length).toBeGreaterThan(0)
+    }
+    const drill = scene.layers.find((mesh) => mesh.name === "drill")!.paint
+    const xs = [...drill.vertices].filter((_, i) => i % 8 === 0)
+    const ys = [...drill.vertices].filter((_, i) => i % 8 === 1)
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(11)
+    expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(19)
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(
+      hole_shape === "circle" ? 2 : 4,
+    )
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(2)
+    const expectedArea =
+      hole_shape === "circle"
+        ? Math.PI
+        : hole_shape === "oval"
+          ? 2 * Math.PI
+          : 4 + Math.PI
+    expect(area(drill)).toBeCloseTo(expectedArea, 1)
+  }
+})
+
+test("concave polygon pads retain their boundary with default hole offsets", () => {
+  const scene = compileCircuitJson([
+    pcb_plated_hole.parse({
+      type: "pcb_plated_hole",
+      pcb_plated_hole_id: "concave-hole",
+      shape: "hole_with_polygon_pad",
+      x: -3,
+      y: 7,
+      pad_outline: [
+        { x: -2, y: -2 },
+        { x: 2, y: -2 },
+        { x: 2, y: 0 },
+        { x: 0, y: 0 },
+        { x: 0, y: 2 },
+        { x: -2, y: 2 },
+      ],
+      layers: ["top", "bottom"],
+      hole_shape: "circle",
+      hole_diameter: 1,
+    }),
+  ])
+  expect(scene.diagnostics).toEqual([])
+  expect(
+    area(scene.layers.find((mesh) => mesh.name === "top")!.paint),
+  ).toBeCloseTo(12)
+  const drill = scene.layers.find((mesh) => mesh.name === "drill")!.paint
+  const xs = [...drill.vertices].filter((_, i) => i % 8 === 0)
+  const ys = [...drill.vertices].filter((_, i) => i % 8 === 1)
+  expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(-3)
+  expect((Math.min(...ys) + Math.max(...ys)) / 2).toBeCloseTo(7)
 })
