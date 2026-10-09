@@ -3,6 +3,7 @@ import {
   getWireTaperSegments,
   hasWireTaper,
 } from "./get-wire-taper-polygon"
+import { drawDashedPath } from "./draw-dashed-path"
 import { drawKeepout } from "./draw-keepout"
 import { drawPcbDimension } from "./pcb-dimension/draw-pcb-dimension"
 import { drawText } from "./text/draw-text"
@@ -263,7 +264,22 @@ export function compileCircuitJson(
           type.endsWith("_outline")
         ) {
           const points =
-            e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean)
+            (input.type === "pcb_note_line" ||
+              input.type === "pcb_silkscreen_line") &&
+            typeof input.x1 === "number" &&
+            typeof input.y1 === "number" &&
+            typeof input.x2 === "number" &&
+            typeof input.y2 === "number"
+              ? [
+                  { x: input.x1, y: input.y1 },
+                  { x: input.x2, y: input.y2 },
+                ]
+              : (e.route ??
+                e.points ??
+                e.outline ??
+                [e.start, e.end].filter(Boolean))
+          if (input.type === "pcb_note_line" && input.color)
+            mesh.color = parseColor(input.color)
           const isFabricationPath = type === "pcb_fabrication_note_path"
           if (isFabricationPath && e.color) mesh.color = parseColor(e.color)
           if (isFabricationPath) {
@@ -271,6 +287,18 @@ export function compileCircuitJson(
               points,
               e.has_stroke === false ? 0 : (e.stroke_width ?? 0.05),
               !!e.is_filled,
+            )
+          } else if (input.type === "pcb_note_line" && input.is_dashed) {
+            const width = input.stroke_width ?? 0.1
+            drawDashedPath(
+              {
+                points,
+                width,
+                dashLength: width * 2,
+                gapLength: width * 2,
+                roundCaps: true,
+              },
+              mesh,
             )
           } else {
             mesh.path(
@@ -289,7 +317,34 @@ export function compileCircuitJson(
             e.corner_radius ?? 0,
             e.ccw_rotation ?? 0,
           )
-          if (e.is_filled) mesh.polygon([points])
+          if (
+            input.type === "pcb_note_rect" ||
+            input.type === "pcb_fabrication_note_rect"
+          ) {
+            if (input.color) mesh.color = parseColor(input.color)
+            if (input.is_filled) mesh.polygon([points])
+            if (input.has_stroke !== false) {
+              const width = input.stroke_width ?? 0.05
+              if (input.is_stroke_dashed) {
+                // Canvas starts the rectangle stroke at its upper-left corner.
+                const cornerEnd = points.length / 4 + 1
+                const strokePoints = [
+                  ...points.slice(0, cornerEnd).reverse(),
+                  ...points.slice(cornerEnd).reverse(),
+                ]
+                drawDashedPath(
+                  {
+                    points: strokePoints,
+                    width,
+                    dashLength: width * 3,
+                    gapLength: width * 2,
+                    closed: true,
+                  },
+                  mesh,
+                )
+              } else mesh.path(points, width, true)
+            }
+          } else if (e.is_filled) mesh.polygon([points])
           else mesh.path(points, e.stroke_width ?? 0.05, true)
         } else if (type.endsWith("_circle")) {
           const points = ellipse(center(e), (e.radius ?? 0) * 2)

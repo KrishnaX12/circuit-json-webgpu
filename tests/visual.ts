@@ -68,6 +68,93 @@ try {
       ),
     ]
   }
+  const dashedAnnotations = await page.evaluate(() => {
+    const drawer = window.gpuTest.drawer
+    const canvas = document.querySelector("canvas")!
+    const frames: Record<string, string> = {}
+    for (const layer of ["top", "bottom"] as const) {
+      const options = {
+        transform: { a: 10, b: 0, c: 0, d: -10, e: 100, f: 100 },
+        selectedLayer: layer,
+        showPcbNotes: true,
+        showFabricationNotes: true,
+        background: [0, 0, 0, 0] as const,
+      }
+      drawer.drawElements(
+        [
+          {
+            type: "pcb_note_line",
+            pcb_note_line_id: "dashed-line",
+            layer,
+            x1: -6,
+            y1: 4,
+            x2: 6,
+            y2: 4,
+            stroke_width: 1,
+            is_dashed: true,
+            color: "#0000ff",
+          },
+        ],
+        options,
+      )
+      frames[`${layer}-line`] = canvas.toDataURL("image/png").split(",")[1]
+      for (const type of [
+        "pcb_note_rect",
+        "pcb_fabrication_note_rect",
+      ] as const) {
+        drawer.drawElements(
+          [
+            {
+              type,
+              pcb_note_rect_id: "note",
+              pcb_fabrication_note_rect_id: "fabrication",
+              pcb_component_id: "component",
+              layer,
+              center: { x: 0, y: 0 },
+              width: 12,
+              height: 8,
+              stroke_width: 1,
+              is_stroke_dashed: true,
+              color: "#0000ff",
+            },
+          ],
+          options,
+        )
+        frames[`${layer}-${type}`] = canvas.toDataURL("image/png").split(",")[1]
+      }
+    }
+    return frames
+  })
+  for (const layer of ["top", "bottom"]) {
+    assert.deepEqual(
+      pixel(dashedAnnotations[`${layer}-line`], 50, 60),
+      [0, 0, 255, 255],
+    )
+    assert.equal(
+      pixel(dashedAnnotations[`${layer}-line`], 70, 60)[3],
+      0,
+      "Dashed line gap must remain empty",
+    )
+    for (const type of ["pcb_note_rect", "pcb_fabrication_note_rect"]) {
+      const frame = dashedAnnotations[`${layer}-${type}`]
+      assert.deepEqual(pixel(frame, 50, 60), [0, 0, 255, 255])
+      assert.equal(
+        pixel(frame, 80, 60)[3],
+        0,
+        "Rectangle dash gap must remain empty",
+      )
+      assert.equal(
+        pixel(frame, 160, 80)[3],
+        0,
+        "Dash phase must continue across the corner",
+      )
+      assert.equal(
+        pixel(frame, 100, 100)[3],
+        0,
+        "Unfilled rectangle center must remain empty",
+      )
+    }
+  }
   const fabrication = await page.evaluate(() => {
     const drawer = window.gpuTest.drawer
     const canvas = document.querySelector("canvas")!

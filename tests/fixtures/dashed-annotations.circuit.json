@@ -1,0 +1,44 @@
+[
+  {
+    "type": "pcb_note_line",
+    "pcb_note_line_id": "line",
+    "layer": "top",
+    "x1": 10,
+    "y1": 85,
+    "x2": 90,
+    "y2": 85,
+    "stroke_width": 2,
+    "is_dashed": true
+  },
+  {
+    "type": "pcb_note_rect",
+    "pcb_note_rect_id": "note",
+    "layer": "top",
+    "center": {
+      "x": 30,
+      "y": 45
+    },
+    "width": 35,
+    "height": 30,
+    "stroke_width": 2,
+    "is_stroke_dashed": true,
+    "has_stroke": true,
+    "color": "#0000ff"
+  },
+  {
+    "type": "pcb_fabrication_note_rect",
+    "pcb_fabrication_note_rect_id": "fabrication",
+    "pcb_component_id": "component",
+    "layer": "top",
+    "center": {
+      "x": 75,
+      "y": 45
+    },
+    "width": 30,
+    "height": 30,
+    "stroke_width": 2,
+    "is_stroke_dashed": true,
+    "has_stroke": true,
+    "color": "#0000ff"
+  }
+]

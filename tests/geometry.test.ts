@@ -687,3 +687,70 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     4,
   )
 })
+
+test("note lines use coordinate endpoints and leave gaps between dashes", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    const line = {
+      type: "pcb_note_line" as const,
+      pcb_note_line_id: "line",
+      layer,
+      x1: 3,
+      y1: 4,
+      x2: 23,
+      y2: 4,
+      stroke_width: 1,
+      color: "#0000ff",
+    }
+    const solid = compileCircuitJson([line])
+    const dashed = compileCircuitJson([{ ...line, is_dashed: true }])
+    expect(solid.diagnostics).toEqual([])
+    expect(dashed.diagnostics).toEqual([])
+    expect(solid.layers[0].name).toBe(`${layer}_notes`)
+    expect(area(solid.layers[0].paint)).toBeGreaterThan(20)
+    expect(area(dashed.layers[0].paint)).toBeLessThan(15)
+    expect([...dashed.layers[0].paint.vertices.slice(2, 6)]).toEqual([
+      0, 0, 1, 1,
+    ])
+    const xs = [...solid.layers[0].paint.vertices].filter((_, i) => i % 8 === 0)
+    expect(Math.min(...xs)).toBeCloseTo(2.5)
+    expect(Math.max(...xs)).toBeCloseTo(23.5)
+    expect(
+      compileCircuitJson([{ ...line, stroke_width: 0, is_dashed: true }])
+        .triangleCount,
+    ).toBe(0)
+  }
+})
+
+test("note rectangles retain fill and respect disabled and dashed strokes", () => {
+  for (const type of ["pcb_note_rect", "pcb_fabrication_note_rect"] as const) {
+    const rect = {
+      type,
+      pcb_note_rect_id: "note",
+      pcb_fabrication_note_rect_id: "fabrication",
+      pcb_component_id: "component",
+      layer: "top" as const,
+      center: { x: 0, y: 0 },
+      width: 12,
+      height: 8,
+      stroke_width: 1,
+      color: "#0000ff",
+    }
+    const dashed = compileCircuitJson([{ ...rect, is_stroke_dashed: true }])
+    expect(dashed.diagnostics).toEqual([])
+    expect(area(dashed.layers[0].paint)).toBeCloseTo(24)
+    expect([...dashed.layers[0].paint.vertices.slice(2, 6)]).toEqual([
+      0, 0, 1, 1,
+    ])
+    expect(
+      compileCircuitJson([{ ...rect, has_stroke: false }]).triangleCount,
+    ).toBe(0)
+    const filled = compileCircuitJson([
+      { ...rect, is_filled: true, has_stroke: false },
+    ])
+    expect(area(filled.layers[0].paint)).toBeCloseTo(96)
+    const both = compileCircuitJson([
+      { ...rect, is_filled: true, is_stroke_dashed: true },
+    ])
+    expect(area(both.layers[0].paint)).toBeCloseTo(120)
+  }
+})

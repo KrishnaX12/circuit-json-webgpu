@@ -66,6 +66,56 @@ function isValidWireTaperSegment(segment) {
   return true;
 }
 
+// lib/draw-dashed-path.ts
+function drawDashedPath({
+  points,
+  width,
+  dashLength,
+  gapLength,
+  closed = false,
+  roundCaps = false
+}, mesh) {
+  if (!(width > 0 && dashLength > 0 && gapLength > 0)) return;
+  const route = closed && points.length > 2 ? [...points, points[0]] : points;
+  let drawing = true;
+  let remaining = dashLength;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1], b = route[i];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!length) continue;
+    const dx = (b.x - a.x) / length, dy = (b.y - a.y) / length;
+    let offset = 0;
+    while (offset < length) {
+      const step = Math.min(remaining, length - offset);
+      if (drawing) {
+        const start = { x: a.x + dx * offset, y: a.y + dy * offset };
+        const end = {
+          x: a.x + dx * (offset + step),
+          y: a.y + dy * (offset + step)
+        };
+        if (roundCaps) mesh.line(start, end, width);
+        else {
+          const nx = -dy * width / 2, ny = dx * width / 2;
+          mesh.polygon([
+            [
+              { x: start.x + nx, y: start.y + ny },
+              { x: end.x + nx, y: end.y + ny },
+              { x: end.x - nx, y: end.y - ny },
+              { x: start.x - nx, y: start.y - ny }
+            ]
+          ]);
+        }
+      }
+      offset += step;
+      remaining -= step;
+      if (remaining === 0) {
+        drawing = !drawing;
+        remaining = drawing ? dashLength : gapLength;
+      }
+    }
+  }
+}
+
 // lib/geometry.ts
 import earcut from "earcut";
 import polygonClipping from "polygon-clipping";
@@ -1087,7 +1137,12 @@ function compileCircuitJson(elements, options = {}) {
             mesh.color = parseColor(e.color);
           drawText(mesh, e, options.textYAxis);
         } else if (type.endsWith("_path") || type.endsWith("_line") || type.endsWith("_outline")) {
-          const points = e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean);
+          const points = (input.type === "pcb_note_line" || input.type === "pcb_silkscreen_line") && typeof input.x1 === "number" && typeof input.y1 === "number" && typeof input.x2 === "number" && typeof input.y2 === "number" ? [
+            { x: input.x1, y: input.y1 },
+            { x: input.x2, y: input.y2 }
+          ] : e.route ?? e.points ?? e.outline ?? [e.start, e.end].filter(Boolean);
+          if (input.type === "pcb_note_line" && input.color)
+            mesh.color = parseColor(input.color);
           const isFabricationPath = type === "pcb_fabrication_note_path";
           if (isFabricationPath && e.color) mesh.color = parseColor(e.color);
           if (isFabricationPath) {
@@ -1095,6 +1150,18 @@ function compileCircuitJson(elements, options = {}) {
               points,
               e.has_stroke === false ? 0 : e.stroke_width ?? 0.05,
               !!e.is_filled
+            );
+          } else if (input.type === "pcb_note_line" && input.is_dashed) {
+            const width = input.stroke_width ?? 0.1;
+            drawDashedPath(
+              {
+                points,
+                width,
+                dashLength: width * 2,
+                gapLength: width * 2,
+                roundCaps: true
+              },
+              mesh
             );
           } else {
             mesh.path(
@@ -1113,7 +1180,30 @@ function compileCircuitJson(elements, options = {}) {
             e.corner_radius ?? 0,
             e.ccw_rotation ?? 0
           );
-          if (e.is_filled) mesh.polygon([points]);
+          if (input.type === "pcb_note_rect" || input.type === "pcb_fabrication_note_rect") {
+            if (input.color) mesh.color = parseColor(input.color);
+            if (input.is_filled) mesh.polygon([points]);
+            if (input.has_stroke !== false) {
+              const width = input.stroke_width ?? 0.05;
+              if (input.is_stroke_dashed) {
+                const cornerEnd = points.length / 4 + 1;
+                const strokePoints = [
+                  ...points.slice(0, cornerEnd).reverse(),
+                  ...points.slice(cornerEnd).reverse()
+                ];
+                drawDashedPath(
+                  {
+                    points: strokePoints,
+                    width,
+                    dashLength: width * 3,
+                    gapLength: width * 2,
+                    closed: true
+                  },
+                  mesh
+                );
+              } else mesh.path(points, width, true);
+            }
+          } else if (e.is_filled) mesh.polygon([points]);
           else mesh.path(points, e.stroke_width ?? 0.05, true);
         } else if (type.endsWith("_circle")) {
           const points = ellipse(center(e), (e.radius ?? 0) * 2);
