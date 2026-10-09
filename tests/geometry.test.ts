@@ -689,6 +689,11 @@ test("fabrication path tessellation unions retraced segments instead of stacking
 })
 
 test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
+  const radius_x = 2,
+    radius_y = 1
+  const center = { x: 3, y: -2 }
+  const strokeWidth = 0.1 // Canvas and SVG use a fixed 0.1 mm oval stroke.
+  const vertexStride = 8 // x, y, r, g, b, a, element index, category.
   for (const layer of ["top", "bottom"] as const) {
     for (const ccw_rotation of [0, 45, 90]) {
       const scene = compileCircuitJson([
@@ -697,9 +702,9 @@ test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
           pcb_silkscreen_oval_id: "oval",
           pcb_component_id: "component",
           layer,
-          center: { x: 3, y: -2 },
-          radius_x: 2,
-          radius_y: 1,
+          center,
+          radius_x,
+          radius_y,
           ccw_rotation,
         },
       ])
@@ -712,16 +717,16 @@ test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
       const radians = (ccw_rotation * Math.PI) / 180
       const xs: number[] = [],
         ys: number[] = []
-      for (let i = 0; i < mesh.vertices.length; i += 8) {
-        const x = mesh.vertices[i] - 3,
-          y = mesh.vertices[i + 1] + 2
+      for (let i = 0; i < mesh.vertices.length; i += vertexStride) {
+        const x = mesh.vertices[i] - center.x,
+          y = mesh.vertices[i + 1] - center.y
         xs.push(x * Math.cos(radians) + y * Math.sin(radians))
         ys.push(-x * Math.sin(radians) + y * Math.cos(radians))
       }
-      expect(Math.max(...xs)).toBeCloseTo(2.05, 2)
-      expect(Math.min(...xs)).toBeCloseTo(-2.05, 2)
-      expect(Math.max(...ys)).toBeCloseTo(1.05, 2)
-      expect(Math.min(...ys)).toBeCloseTo(-1.05, 2)
+      expect(Math.max(...xs)).toBeCloseTo(radius_x + strokeWidth / 2, 2)
+      expect(Math.min(...xs)).toBeCloseTo(-radius_x - strokeWidth / 2, 2)
+      expect(Math.max(...ys)).toBeCloseTo(radius_y + strokeWidth / 2, 2)
+      expect(Math.min(...ys)).toBeCloseTo(-radius_y - strokeWidth / 2, 2)
       expect(scene.layers[0].erase.indices.length).toBe(0)
     }
   }

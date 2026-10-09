@@ -1,4 +1,5 @@
 import fabricationPathFill from "../tests/fixtures/fabrication-path-fill.circuit.json"
+import silkscreenOval from "../tests/fixtures/silkscreen-oval.circuit.json"
 import { teardropDemo } from "./teardrop-demo"
 import type { CircuitJson, RenderOptions } from "../lib"
 export type Fixture = { elements: CircuitJson; options?: RenderOptions }
@@ -371,6 +372,13 @@ export const fixtures: Record<string, Fixture> = {
   "silkscreen-graphics": {
     elements: [board, ...silkscreenGraphics] as CircuitJson,
     options: { selectedLayer: "top", hiddenLayerOpacity: 1 },
+  },
+  "silkscreen-oval": {
+    elements: silkscreenOval as CircuitJson,
+    options: {
+      selectedLayer: "top",
+      transform: { a: 40, b: 0, c: 0, d: -40, e: 400, f: 300 },
+    },
   },
   teardrops: {
     elements: teardropDemo,
