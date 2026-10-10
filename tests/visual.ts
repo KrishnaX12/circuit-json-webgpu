@@ -5,6 +5,7 @@ import { createServer } from "vite"
 import { chromium } from "playwright"
 import { PNG } from "pngjs"
 import pixelmatch from "pixelmatch"
+import { compose, scale, translate } from "transformation-matrix"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const server = await createServer({
@@ -180,6 +181,69 @@ try {
         "Fabrication overlap must apply alpha once",
       )
     }
+  }
+  const translatedPathOrigin = {
+    x: -11.299999199999984,
+    y: 0.4999999999999997,
+  }
+  const translatedPaths = await page.evaluate(
+    ({ origin, transform }) => {
+      const frames: string[] = []
+      const { x, y } = origin
+      for (const layer of ["top", "bottom"] as const) {
+        window.gpuTest.drawer.drawElements(
+          [
+            {
+              type: "pcb_fabrication_note_path",
+              pcb_fabrication_note_path_id: "translated-retrace",
+              pcb_component_id: "component",
+              layer,
+              route: [
+                { x, y },
+                { x: x + 1, y: y + 0.000001 },
+                { x, y },
+              ],
+              stroke_width: 0.254,
+              color: "rgba(255,0,0,0.5)",
+            },
+          ],
+          {
+            transform,
+            selectedLayer: layer,
+            showFabricationNotes: true,
+            background: [0, 0, 0, 0],
+          },
+        )
+        if (window.gpuTest.drawer.diagnostics.length)
+          throw new Error(JSON.stringify(window.gpuTest.drawer.diagnostics))
+        frames.push(
+          document
+            .querySelector("canvas")!
+            .toDataURL("image/png")
+            .split(",")[1],
+        )
+      }
+      return frames
+    },
+    {
+      origin: translatedPathOrigin,
+      transform: compose(
+        translate(50, 50),
+        scale(100, 100),
+        translate(-translatedPathOrigin.x, -translatedPathOrigin.y),
+      ),
+    },
+  )
+  for (const frame of translatedPaths) {
+    for (const x of [45, 50, 100, 155]) {
+      const rgba = pixel(frame, x, 50)
+      assert.equal(rgba[0], 255)
+      assert(
+        Math.abs(rgba[3] - 128) <= 1,
+        "Translated retraced caps preserve alpha",
+      )
+    }
+    assert.equal(pixel(frame, 100, 70)[3], 0, "Stroke width stays unchanged")
   }
   const pours = await page.evaluate(() =>
     window.gpuTest.checkCopperPourOpacity(),

@@ -591,6 +591,18 @@ const fabricationPath = {
   stroke_width: 2,
 }
 
+function compileTranslatedFabricationPath({
+  layer,
+  route,
+}: {
+  layer: "top" | "bottom"
+  route: typeof fabricationPath.route
+}) {
+  return compileCircuitJson([
+    { ...fabricationPath, layer, route, stroke_width: 0.254 },
+  ])
+}
+
 test("fabrication path fills triangulate concave regions without widening them", () => {
   for (const layer of ["top", "bottom"] as const) {
     for (const route of [
@@ -686,4 +698,55 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     80 - 4 + 12 * Math.sin(Math.PI / 12),
     4,
   )
+})
+
+test("translated fabrication paths tolerate round-cap floating-point noise", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    for (const x of [-11.299999199999984, 6.600000800000018]) {
+      const y = 0.4999999999999997
+      for (const route of [
+        [
+          { x, y },
+          { x: x + 1, y: y + 0.000001 },
+          { x, y },
+        ],
+        [
+          { x, y },
+          { x: x + 0.1, y: y + 0.1 },
+          { x: x + 0.1, y },
+          { x, y },
+        ],
+      ]) {
+        const scene = compileTranslatedFabricationPath({ layer, route })
+        expect(scene.diagnostics).toEqual([])
+        const mesh = scene.layers.find(
+          (l) => l.name === `${layer}_fabrication`,
+        )!.paint
+        expect(mesh.indices.length).toBeGreaterThan(0)
+        expect([...mesh.vertices].every(Number.isFinite)).toBe(true)
+        const origin = compileTranslatedFabricationPath({
+          layer,
+          route: route.map((p) => ({ x: p.x - x, y: p.y - y })),
+        })
+        expect(origin.diagnostics).toEqual([])
+        expect(area(mesh)).toBeCloseTo(area(origin.layers[0].paint), 5)
+        // Reversing or retracing the path must preserve coverage, applying alpha once.
+        const reversed = compileTranslatedFabricationPath({
+          layer,
+          route: [...route].reverse(),
+        })
+        const retraced = compileTranslatedFabricationPath({
+          layer,
+          route: [...route, ...route.slice(1)],
+        })
+        for (const equivalent of [reversed, retraced]) {
+          expect(equivalent.diagnostics).toEqual([])
+          expect(area(equivalent.layers[0].paint)).toBeCloseTo(area(mesh), 5)
+          expect(meshBounds(equivalent.layers[0].paint)).toEqual(
+            meshBounds(mesh),
+          )
+        }
+      }
+    }
+  }
 })

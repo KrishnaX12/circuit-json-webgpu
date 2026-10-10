@@ -58,11 +58,22 @@ export class MeshBuilder {
         ])
     }
     if (!polygons.length) return
+    // Round-cap trigonometry can place shared vertices a few ULPs apart. Snap
+    // before clipping so coincident edges agree; 1e-9 mm is far below the
+    // precision of the Float32 mesh uploaded to the GPU.
+    const snapped = polygons.map((polygon) =>
+      polygon.map((ring) =>
+        ring.map<[number, number]>(([x, y]) => [
+          Math.round(x * 1e9) / 1e9,
+          Math.round(y * 1e9) / 1e9,
+        ]),
+      ),
+    )
     // Tessellate the union, not overlapping triangles: source-over blending
     // must apply the note's alpha only once even at crossings and filled edges.
     for (const polygon of polygonClipping.union(
-      polygons[0],
-      ...polygons.slice(1),
+      snapped[0],
+      ...snapped.slice(1),
     ))
       this.polygon(polygon.map((ring) => ring.map(([x, y]) => ({ x, y }))))
   }
