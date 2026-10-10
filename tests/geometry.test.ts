@@ -695,7 +695,7 @@ test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
   const strokeWidth = 0.1 // Canvas and SVG use a fixed 0.1 mm oval stroke.
   const vertexStride = 8 // x, y, r, g, b, a, element index, category.
   for (const layer of ["top", "bottom"] as const) {
-    for (const ccw_rotation of [0, 45, 90]) {
+    for (const ccw_rotation of [undefined, 0, 45, 90]) {
       const scene = compileCircuitJson([
         {
           type: "pcb_silkscreen_oval",
@@ -705,7 +705,7 @@ test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
           center,
           radius_x,
           radius_y,
-          ccw_rotation,
+          ...(ccw_rotation === undefined ? {} : { ccw_rotation }),
         },
       ])
       expect(scene.diagnostics).toEqual([])
@@ -714,7 +714,7 @@ test("silkscreen ovals preserve radii, rotation, center, and layer", () => {
       ])
       const mesh = scene.layers[0].paint
       expect(mesh.indices.length).toBeGreaterThan(0)
-      const radians = (ccw_rotation * Math.PI) / 180
+      const radians = ((ccw_rotation ?? 0) * Math.PI) / 180
       const xs: number[] = [],
         ys: number[] = []
       for (let i = 0; i < mesh.vertices.length; i += vertexStride) {
