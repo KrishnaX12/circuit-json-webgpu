@@ -687,3 +687,49 @@ test("fabrication path tessellation unions retraced segments instead of stacking
     4,
   )
 })
+
+test("translated fabrication paths tolerate round-cap floating-point noise", () => {
+  for (const layer of ["top", "bottom"] as const) {
+    for (const x of [-11.299999199999984, 6.600000800000018]) {
+      const y = 0.4999999999999997
+      for (const route of [
+        [
+          { x, y },
+          { x: x + 1, y: y + 0.000001 },
+          { x, y },
+        ],
+        [
+          { x, y },
+          { x: x + 0.1, y: y + 0.1 },
+          { x: x + 0.1, y },
+          { x, y },
+        ],
+      ]) {
+        const compile = (route: typeof fabricationPath.route) =>
+          compileCircuitJson([
+            { ...fabricationPath, layer, route, stroke_width: 0.254 },
+          ])
+        const scene = compile(route)
+        expect(scene.diagnostics).toEqual([])
+        const mesh = scene.layers.find(
+          (l) => l.name === `${layer}_fabrication`,
+        )!.paint
+        expect(mesh.indices.length).toBeGreaterThan(0)
+        expect([...mesh.vertices].every(Number.isFinite)).toBe(true)
+        const origin = compile(route.map((p) => ({ x: p.x - x, y: p.y - y })))
+        expect(origin.diagnostics).toEqual([])
+        expect(area(mesh)).toBeCloseTo(area(origin.layers[0].paint), 5)
+        // Reversing or retracing the path must preserve coverage, applying alpha once.
+        const reversed = compile([...route].reverse())
+        const retraced = compile([...route, ...route.slice(1)])
+        for (const equivalent of [reversed, retraced]) {
+          expect(equivalent.diagnostics).toEqual([])
+          expect(area(equivalent.layers[0].paint)).toBeCloseTo(area(mesh), 5)
+          expect(meshBounds(equivalent.layers[0].paint)).toEqual(
+            meshBounds(mesh),
+          )
+        }
+      }
+    }
+  }
+})
