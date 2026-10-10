@@ -591,6 +591,18 @@ const fabricationPath = {
   stroke_width: 2,
 }
 
+function compileTranslatedFabricationPath({
+  layer,
+  route,
+}: {
+  layer: "top" | "bottom"
+  route: typeof fabricationPath.route
+}) {
+  return compileCircuitJson([
+    { ...fabricationPath, layer, route, stroke_width: 0.254 },
+  ])
+}
+
 test("fabrication path fills triangulate concave regions without widening them", () => {
   for (const layer of ["top", "bottom"] as const) {
     for (const route of [
@@ -705,23 +717,28 @@ test("translated fabrication paths tolerate round-cap floating-point noise", () 
           { x, y },
         ],
       ]) {
-        const compile = (route: typeof fabricationPath.route) =>
-          compileCircuitJson([
-            { ...fabricationPath, layer, route, stroke_width: 0.254 },
-          ])
-        const scene = compile(route)
+        const scene = compileTranslatedFabricationPath({ layer, route })
         expect(scene.diagnostics).toEqual([])
         const mesh = scene.layers.find(
           (l) => l.name === `${layer}_fabrication`,
         )!.paint
         expect(mesh.indices.length).toBeGreaterThan(0)
         expect([...mesh.vertices].every(Number.isFinite)).toBe(true)
-        const origin = compile(route.map((p) => ({ x: p.x - x, y: p.y - y })))
+        const origin = compileTranslatedFabricationPath({
+          layer,
+          route: route.map((p) => ({ x: p.x - x, y: p.y - y })),
+        })
         expect(origin.diagnostics).toEqual([])
         expect(area(mesh)).toBeCloseTo(area(origin.layers[0].paint), 5)
         // Reversing or retracing the path must preserve coverage, applying alpha once.
-        const reversed = compile([...route].reverse())
-        const retraced = compile([...route, ...route.slice(1)])
+        const reversed = compileTranslatedFabricationPath({
+          layer,
+          route: [...route].reverse(),
+        })
+        const retraced = compileTranslatedFabricationPath({
+          layer,
+          route: [...route, ...route.slice(1)],
+        })
         for (const equivalent of [reversed, retraced]) {
           expect(equivalent.diagnostics).toEqual([])
           expect(area(equivalent.layers[0].paint)).toBeCloseTo(area(mesh), 5)
