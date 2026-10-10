@@ -125,9 +125,17 @@ var MeshBuilder = class {
         ]);
     }
     if (!polygons.length) return;
+    const snapped = polygons.map(
+      (polygon) => polygon.map(
+        (ring) => ring.map(([x, y]) => [
+          Math.round(x * 1e9) / 1e9,
+          Math.round(y * 1e9) / 1e9
+        ])
+      )
+    );
     for (const polygon of polygonClipping.union(
-      polygons[0],
-      ...polygons.slice(1)
+      snapped[0],
+      ...snapped.slice(1)
     ))
       this.polygon(polygon.map((ring) => ring.map(([x, y]) => ({ x, y }))));
   }
